@@ -1,0 +1,17 @@
+# Firefox base + extra fonts, so the container does not stand out with an
+# unusually small font set. Built locally: docker compose build --pull firefox
+FROM jlesage/firefox:latest
+
+# USER 0 (numeric) is required -- the base image has no "root" passwd entry, so
+# `USER root` fails the build. The image's init drops to USER_ID at runtime.
+USER 0
+
+RUN apk add --no-cache \
+      font-noto \
+      font-noto-emoji \
+      font-noto-cjk \
+      ttf-dejavu \
+      ttf-liberation \
+      ttf-freefont \
+      font-terminus \
+    && fc-cache -f

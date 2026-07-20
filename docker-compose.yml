@@ -1,0 +1,91 @@
+# Private browser stack: Firefox in a container whose ONLY network path is a
+# WireGuard VPN tunnel (via Gluetun). If the tunnel drops, Firefox has no route
+# anywhere -- not even your LAN. See README.md.
+
+services:
+  gluetun:
+    image: qmcgaw/gluetun:v3.40   # pinned on purpose; see README (API changed after v3.40)
+    container_name: gluetun-proton
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      VPN_SERVICE_PROVIDER: protonvpn   # any Gluetun-supported provider works
+      VPN_TYPE: wireguard
+      WIREGUARD_PRIVATE_KEY: ${WIREGUARD_PRIVATE_KEY}
+      WIREGUARD_ADDRESSES: ${WIREGUARD_ADDRESSES}
+      SERVER_COUNTRIES: Singapore        # change to your preferred exit country
+      FIREWALL: "on"
+      FIREWALL_OUTBOUND_SUBNETS: ""       # blocks the LAN too -> total kill switch
+      DOT: "on"
+      DOT_PROVIDERS: cloudflare
+      BLOCK_MALICIOUS: "off"              # ON can break DNS on some providers; see README
+      HEALTH_VPN_DURATION_INITIAL: 30s
+    healthcheck:
+      # /v1/openvpn/status is the v3.40 route; it becomes /v1/vpn/status in v3.41+
+      test: ["CMD", "wget", "-qO-", "http://localhost:8000/v1/openvpn/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    ports:
+      - "127.0.0.1:7814:5800"   # VNC web UI (localhost only)
+      - "127.0.0.1:8080:8080"   # CreepJS test server (localhost only; 'test' profile)
+    volumes:
+      - ./gluetun:/gluetun
+
+  firefox:
+    build:
+      context: .
+      dockerfile: Dockerfile.firefox
+    image: private-firefox:fonts
+    container_name: private-firefox
+    restart: unless-stopped
+    depends_on:
+      gluetun:
+        condition: service_healthy   # never starts before the tunnel is up
+    network_mode: "service:gluetun"  # borrows Gluetun's netns; no network of its own
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      TZ: Etc/UTC                    # container logs only; RFP forces the JS-visible TZ to UTC
+      USER_ID: 1000
+      GROUP_ID: 1000
+      ENABLE_CLIPBOARD: 1
+      DISPLAY_WIDTH: 1920
+      DISPLAY_HEIGHT: 1080
+      SECURE_CONNECTION: 1
+      VNC_PASSWORD: ${VNC_PASSWORD}
+      FF_OPEN_URL: about:blank       # set to https://ipinfo.io/json for an IP check on launch
+      FF_PREF_RFP: "privacy.resistFingerprinting=true"
+      FF_PREF_LETTERBOX: "privacy.resistFingerprinting.letterboxing=true"
+      FF_PREF_WEBGL: "webgl.disabled=true"
+      FF_PREF_TELEMETRY: "toolkit.telemetry.enabled=false"
+      FF_PREF_DATAREPORT: "datareporting.healthreport.uploadEnabled=false"
+      FF_PREF_PREFETCH: "network.prefetch-next=false"
+      FF_PREF_SPECULATE: "network.http.speculative-parallel-limit=0"
+      FF_PREF_SEARCHSUGGEST: "browser.search.suggest.enabled=false"
+    volumes:
+      - ./firefox-downloads:/storage
+    tmpfs:
+      - "/config:size=512m,uid=1000,gid=1000,mode=0755"   # ephemeral profile; keep the quotes
+
+  # Optional self-hosted CreepJS fingerprint tester. Disabled by default.
+  # Enable:  docker compose --profile test up -d creepjs
+  # Populate ./creepjs/docs with a CreepJS build first (see README).
+  creepjs:
+    image: nginx:alpine
+    container_name: creepjs-server
+    profiles: ["test"]
+    restart: unless-stopped
+    depends_on:
+      gluetun:
+        condition: service_healthy
+    network_mode: "service:gluetun"
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ./creepjs/docs:/usr/share/nginx/html:ro
+      - ./nginx-8080.conf:/etc/nginx/conf.d/default.conf:ro
