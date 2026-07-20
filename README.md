@@ -11,6 +11,14 @@ for Firefox over a VNC web UI, and Firefox's own `resistFingerprinting`.
 > Last verified: 2026-07-20 (Firefox 151, Gluetun v3.40). This is a security
 > tool; if that date looks old, treat it as unverified.
 
+## What this is, and what it isn't
+
+Three things to know before you start:
+
+- Privacy, not anonymity. Your ISP, your LAN, and the sites you visit cannot see your real IP, but your VPN provider still can. If you need to be untraceable, use Tor instead.
+- Not a one-click app. It needs Docker and a paid WireGuard VPN (this example uses Proton).
+- Closing it erases everything. Bookmarks, logins, history, and cookies live in RAM and are wiped every time you stop the stack, by design. Downloads are kept.
+
 ## No application code to audit
 
 This repository has no application code to audit or trust. It is a Docker Compose
