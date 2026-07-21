@@ -4,13 +4,14 @@
 # Deliberate findings, suppressed inline with their reasons (see README):
 # checkov:skip=CKV_DOCKER_7:Floating :latest is deliberate, pulls base security patches (README "Optional hardening")
 # checkov:skip=CKV_DOCKER_2:HEALTHCHECK inherited from jlesage base; stack gates on Gluetun's healthcheck (README)
-# checkov:skip=CKV_DOCKER_8:USER 0 required for apk; base image init drops to USER_ID at runtime (Dockerfile comment)
+# checkov:skip=CKV_DOCKER_3:No build-time USER by design; base has no uid-0 passwd entry, s6 init drops to USER_ID at runtime (README)
+# checkov:skip=CKV_DOCKER_8:No explicit root USER declared; runtime user is USER_ID via the base image's init (README)
 FROM jlesage/firefox:latest
 
-# USER 0 (numeric) is required -- the base image has no "root" passwd entry, so
-# `USER root` fails the build. The image's init drops to USER_ID at runtime.
-USER 0
-
+# No explicit USER: the jlesage/Alpine base builds as root by default (it declares no
+# USER of its own) and has no uid-0 entry in /etc/passwd, so an explicit `USER 0` or
+# `USER root` fails under strict runc ("unable to find user 0"). Building as the default
+# root is portable; the base's s6 init still drops to USER_ID at runtime.
 RUN apk add --no-cache \
       font-noto \
       font-noto-emoji \

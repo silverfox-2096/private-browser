@@ -7,6 +7,3 @@ ignored:
   # apk add without version pins -- pinning is listed as OPTIONAL hardening in the README;
   # it is not a default because it would hold back font-package security updates.
   - DL3018
-  # Last USER is root (USER 0) -- required to install fonts. The base image's init drops
-  # to USER_ID (1000) at runtime; see the comment above USER 0 in Dockerfile.firefox.
-  - DL3002
