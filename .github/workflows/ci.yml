@@ -77,7 +77,7 @@ jobs:
       - name: Build the image Trivy will scan
         run: docker build -f Dockerfile.firefox -t private-firefox:ci .
       - name: Trivy -- gate on FIXABLE High/Critical only
-        uses: aquasecurity/trivy-action@0.24.0   # pin to SHA before committing
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25   # v0.36.0
         with:
           image-ref: private-firefox:ci
           severity: HIGH,CRITICAL
@@ -86,7 +86,7 @@ jobs:
           format: table
       - name: Trivy -- full SARIF (all severities, never fails the job)
         if: always()
-        uses: aquasecurity/trivy-action@0.24.0   # pin to SHA before committing
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25   # v0.36.0
         with:
           image-ref: private-firefox:ci
           format: sarif
