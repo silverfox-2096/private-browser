@@ -94,7 +94,9 @@ service, and everything binds to `127.0.0.1`. Nothing is exposed to your LAN.
    ```
    ./launch.sh
    ```
-   (or `docker compose up -d`)
+   Use `./launch.sh` rather than `docker compose up -d` directly: it checks that the
+   credential file from step 2 exists first. If you skip that check and the file is
+   missing, Docker creates an empty directory in its place and the web login breaks.
 5. Open https://127.0.0.1:7814, accept the self-signed cert, and log in with the
    username (`myuser`) and the password you set above.
 
@@ -164,7 +166,7 @@ Changing any of these without reading can break the stack or weaken it. You will
 | `BLOCK_MALICIOUS: "off"` | Turning it on can push Gluetun's DNS resolver into a restart loop on some providers, so DNS stops resolving. Your provider's own malware blocking already covers this. |
 | `FIREWALL_OUTBOUND_SUBNETS: ""` | Blocks LAN access too, which is what makes the kill switch total. |
 | Ports on `gluetun`, `127.0.0.1:` prefix | They have to live on Gluetun (shared namespace) and stay loopback-bound, never exposed to the LAN. |
-| `SECURE_CONNECTION: 1` and `WEB_AUTHENTICATION: 1` | TLS plus an HTTPS login page for the web UI. Credentials are a bcrypt hash in a host-mounted `webauth-htpasswd` file, so they are not plaintext and not readable via `docker inspect`. This replaces the older `VNC_PASSWORD` (capped at 8 characters, exposed via `docker inspect`). The file is mounted read-write because the image's init sets its permissions at startup. |
+| `SECURE_CONNECTION: 1` and `WEB_AUTHENTICATION: 1` | TLS plus an HTTPS login page for the web UI. Credentials are a bcrypt hash in a host-mounted `webauth-htpasswd` file, so they are not plaintext and not readable via `docker inspect`. This replaces the older `VNC_PASSWORD` (capped at 8 characters, exposed via `docker inspect`). The file is mounted read-write because the image's init sets its permissions at startup; note this is the one host file the browser container can write, so a compromised container could rewrite the hash (worst case: lock you out, or persist its own login to the loopback UI) — a minor channel an attacker already inside the container gains little from. |
 | `/config` as a quoted tmpfs, `mode=0755` | Ephemeral profile. Keep the quotes: YAML otherwise strips the leading zero from `0755` and the container will not start. |
 | `webgl.disabled=true` | Removes an identifying WebGL hash. Breaks 3D sites and web maps. |
 | Gluetun pinned to `v3.40` by digest | Update deliberately. The image runs its own healthcheck (it tests tunnel connectivity), so there is no custom healthcheck to maintain. In v3.41+ the control-server route `/v1/openvpn/status` becomes `/v1/vpn/status`; if you bump the version, change the tag and digest together and re-verify health. |

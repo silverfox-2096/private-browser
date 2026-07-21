@@ -3,6 +3,12 @@
 cd "$(dirname "$(readlink -f "$0")")" || exit 1
 # Web auth needs the htpasswd file to exist first. If it is missing, Docker would
 # create an empty directory at the mount point and the web login would break confusingly.
+if [ -d webauth-htpasswd ]; then
+  echo "webauth-htpasswd is a DIRECTORY, not a file -- Docker created it from a" >&2
+  echo "missing-file mount on an earlier run. Remove it, then regenerate the credential:" >&2
+  echo "  rm -r webauth-htpasswd   (then follow README Setup)" >&2
+  exit 1
+fi
 if [ ! -f webauth-htpasswd ]; then
   echo "Missing webauth-htpasswd -- generate it first (see README Setup)." >&2
   exit 1
