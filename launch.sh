@@ -1,6 +1,12 @@
 #!/bin/bash
 # Start the stack and open the VNC web UI once it responds.
 cd "$(dirname "$(readlink -f "$0")")" || exit 1
+# Web auth needs the htpasswd file to exist first. If it is missing, Docker would
+# create an empty directory at the mount point and the web login would break confusingly.
+if [ ! -f webauth-htpasswd ]; then
+  echo "Missing webauth-htpasswd -- generate it first (see README Setup)." >&2
+  exit 1
+fi
 docker compose up -d
 # wait for the web UI to respond before opening the browser
 ready=0

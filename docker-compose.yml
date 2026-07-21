@@ -53,7 +53,7 @@ services:
       DISPLAY_WIDTH: 1920
       DISPLAY_HEIGHT: 1080
       SECURE_CONNECTION: 1
-      VNC_PASSWORD: ${VNC_PASSWORD}
+      WEB_AUTHENTICATION: 1          # HTTPS login page; bcrypt creds in webauth-htpasswd (see below)
       FF_OPEN_URL: about:blank       # set to https://ipinfo.io/json for an IP check on launch
       # Hardening is intentionally minimal: RFP + the tmpfs/namespace architecture do the
       # work here, not a long user.js. See the README design notes.
@@ -65,10 +65,16 @@ services:
       FF_PREF_PREFETCH: "network.prefetch-next=false"
       FF_PREF_SPECULATE: "network.http.speculative-parallel-limit=0"
       FF_PREF_SEARCHSUGGEST: "browser.search.suggest.enabled=false"
-    # No host volume: downloads land in the tmpfs profile and are wiped on stop,
-    # like the rest of the profile. This is deliberate -- the stack is amnesic.
+    # No persistent profile volume: downloads land in the tmpfs profile and are wiped
+    # on stop, like the rest of the profile. This is deliberate -- the stack is amnesic.
+    # (The webauth-htpasswd mount below is a single credential file, not profile data.)
     tmpfs:
       - "/config:size=512m,uid=1000,gid=1000,mode=0755"   # ephemeral profile; keep the quotes
+    # Web-auth credentials: a bcrypt htpasswd file you generate on the host (see README Setup).
+    # Mounted read-write on purpose -- jlesage's init chmods it at startup, which fails on a
+    # read-only mount and restart-loops the container. The file holds only a bcrypt hash.
+    volumes:
+      - ./webauth-htpasswd:/config/webauth-htpasswd
 
   # Optional self-hosted CreepJS fingerprint tester. Disabled by default.
   # Enable:  docker compose --profile test up -d creepjs

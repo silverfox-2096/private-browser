@@ -78,19 +78,25 @@ service, and everything binds to `127.0.0.1`. Nothing is exposed to your LAN.
    chmod 600 .env
    ```
    Fill in `WIREGUARD_PRIVATE_KEY` and `WIREGUARD_ADDRESSES` from your provider's
-   WireGuard config file, and set a `VNC_PASSWORD`. Note the RFB protocol caps VNC
-   passwords at 8 characters and the value is readable via `docker inspect`; because
-   the UI is bound to localhost only, this gates local access rather than serving as
-   a strong secret.
-2. Optionally, set `SERVER_COUNTRIES` in `docker-compose.yml` to your preferred exit
+   WireGuard config file.
+2. Create the web-login credential. The web UI is protected by an HTTPS login page
+   backed by a bcrypt htpasswd file. Generate it on the host (you are prompted for a
+   password; nothing is written to your shell history):
+   ```
+   docker run --rm -it -v $PWD:/w -w /w httpd:alpine htpasswd -cB webauth-htpasswd myuser
+   sudo chown $USER:$USER webauth-htpasswd && chmod 600 webauth-htpasswd
+   ```
+   The `chown` is needed because the container creates the file as root. It holds only
+   a bcrypt hash and is gitignored; keep it out of version control.
+3. Optionally, set `SERVER_COUNTRIES` in `docker-compose.yml` to your preferred exit
    country.
-3. Build and start:
+4. Build and start:
    ```
    ./launch.sh
    ```
    (or `docker compose up -d`)
-4. Open https://127.0.0.1:7814, accept the self-signed cert, and enter your
-   `VNC_PASSWORD`.
+5. Open https://127.0.0.1:7814, accept the self-signed cert, and log in with the
+   username (`myuser`) and the password you set above.
 
 ## Daily use
 
@@ -158,7 +164,7 @@ Changing any of these without reading can break the stack or weaken it. You will
 | `BLOCK_MALICIOUS: "off"` | Turning it on can push Gluetun's DNS resolver into a restart loop on some providers, so DNS stops resolving. Your provider's own malware blocking already covers this. |
 | `FIREWALL_OUTBOUND_SUBNETS: ""` | Blocks LAN access too, which is what makes the kill switch total. |
 | Ports on `gluetun`, `127.0.0.1:` prefix | They have to live on Gluetun (shared namespace) and stay loopback-bound, never exposed to the LAN. |
-| `SECURE_CONNECTION: 1` and `VNC_PASSWORD` | TLS and a login on the VNC web UI. The password is capped at 8 characters (RFB) and readable via `docker inspect`; it is loopback-only, so it gates local access rather than acting as a strong secret. |
+| `SECURE_CONNECTION: 1` and `WEB_AUTHENTICATION: 1` | TLS plus an HTTPS login page for the web UI. Credentials are a bcrypt hash in a host-mounted `webauth-htpasswd` file, so they are not plaintext and not readable via `docker inspect`. This replaces the older `VNC_PASSWORD` (capped at 8 characters, exposed via `docker inspect`). The file is mounted read-write because the image's init sets its permissions at startup. |
 | `/config` as a quoted tmpfs, `mode=0755` | Ephemeral profile. Keep the quotes: YAML otherwise strips the leading zero from `0755` and the container will not start. |
 | `webgl.disabled=true` | Removes an identifying WebGL hash. Breaks 3D sites and web maps. |
 | Gluetun pinned to `v3.40` by digest | Update deliberately. The image runs its own healthcheck (it tests tunnel connectivity), so there is no custom healthcheck to maintain. In v3.41+ the control-server route `/v1/openvpn/status` becomes `/v1/vpn/status`; if you bump the version, change the tag and digest together and re-verify health. |
@@ -259,6 +265,7 @@ interchangeable.
 
 ## Changelog
 
+- 2026-07-21: Replaced the VNC password with jlesage's `WEB_AUTHENTICATION`, an HTTPS login page backed by a bcrypt htpasswd file that you generate on the host and that is gitignored. This removes the 8-character RFB cap and keeps the credential out of `docker inspect`. Dropped `VNC_PASSWORD` (the web login is the only prompt now), mounted the credential file read-write (the image chmods it on startup), and added a `launch.sh` guard that refuses to start if the file is missing.
 - 2026-07-21: Housekeeping after a follow-up review. Verified the pinned Gluetun digest against the official image on Docker Hub. Removed two dead directories from `.gitignore`, corrected the VNC password note to reflect its 8-character limit, and made `launch.sh` fail with a clear message instead of opening a broken page if the stack does not come up. Split the verification stamp into separate "docs & config" and "runtime & leak-tested" dates.
 - 2026-07-21: Corrected several claims after a documentation review. Removed a non-functional `ENABLE_CLIPBOARD` variable and rewrote the clipboard note (sharing is a built-in, bidirectional web-UI feature with no off-switch). Made downloads honestly ephemeral by removing the non-working persistence mount. Dropped the custom Gluetun healthcheck in favour of the stronger built-in one, removed the unused `:8080` host publish from the default, and pinned Gluetun by digest. Added a troubleshooting note for recovering after a Gluetun restart, a swap caveat on the amnesia claim, and honest wording on the VNC password and the security review's limits.
 - 2026-07-21: Added the design notes section, covering the WebGL choice (tested enabled against disabled), locale handling, and why the optional hardening settings are not defaults. Described the security review accurately, as an automated `/security-review` in a separate session rather than a third-party audit.

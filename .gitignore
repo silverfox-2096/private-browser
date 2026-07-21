@@ -1,5 +1,6 @@
 # Secrets -- never commit
 .env
+webauth-htpasswd
 
 # Runtime state and data (created at run time)
 gluetun/
