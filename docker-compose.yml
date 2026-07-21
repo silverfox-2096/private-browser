@@ -59,6 +59,8 @@ services:
       SECURE_CONNECTION: 1
       VNC_PASSWORD: ${VNC_PASSWORD}
       FF_OPEN_URL: about:blank       # set to https://ipinfo.io/json for an IP check on launch
+      # Hardening is intentionally minimal: RFP + the tmpfs/namespace architecture do the
+      # work here, not a long user.js. See the README design notes.
       FF_PREF_RFP: "privacy.resistFingerprinting=true"
       FF_PREF_LETTERBOX: "privacy.resistFingerprinting.letterboxing=true"
       FF_PREF_WEBGL: "webgl.disabled=true"
