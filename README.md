@@ -128,7 +128,7 @@ keeps your fingerprint on your own machine.
 
 ## Design decisions worth understanding first
 
-Changing any of these without reading can break the stack or weaken it.
+Changing any of these without reading can break the stack or weaken it. You will not find a long `user.js` here. The hardening is this short list of preferences plus Firefox's `resistFingerprinting`, and that is deliberate; the reasoning is under [Design notes](#design-notes-and-anticipated-questions).
 
 | Setting | Why it is set this way |
 |---|---|
