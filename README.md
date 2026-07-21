@@ -160,7 +160,10 @@ The defaults are already sound, and the automated review noted above reported no
 vulnerabilities within its scope. If you want to go further, you can add
 `mem_limit` and `pids_limit`
 to the services, pin the Firefox base image by digest instead of `:latest`, and pin
-the `apk` package versions in `Dockerfile.firefox` for reproducible builds.
+the `apk` package versions in `Dockerfile.firefox` for reproducible builds. These are
+left optional on purpose. A memory limit on a browser can kill tabs under load, and
+pinning the Firefox base by digest would hold back the security patches the floating
+tag pulls in. Add them when your situation calls for it.
 
 ## Design notes and anticipated questions
 
@@ -183,6 +186,10 @@ With RFP on and WebGL enabled, Firefox masks the renderer string to a generic `M
 Enabling it also exposes the WebGL capability set, meaning dozens of parameters and extension names, as a stable hash that does not change between sessions. This container renders in software because it has no GPU, so that capability set reflects the software graphics stack and is more likely to differ from a typical hardware-GPU user than to blend in. RFP normalizes the renderer string but leaves this capability list alone.
 
 Disabling WebGL removes that surface. A browser with no WebGL is also a normal posture among privacy-conscious users, since it is what the Tor Browser's "Safer" security level does. A browser running RFP is already identifiable as an RFP browser, so the realistic crowd to blend into is other RFP users, and WebGL-off is common there. Given the choice between a masked renderer that still carries a stable software-capability fingerprint and no WebGL surface at all, disabling exposes less. The cost is that 3D sites and web maps will not render, which is acceptable for this browser.
+
+### Does the container leak your locale or timezone?
+
+No. RFP reports the language as `en-US` and spoofs the timezone to UTC no matter where you are. The container's own locale is set to `en_US.UTF-8`, so the operating-system locale and the browser-reported one agree and your real regional settings never reach a page. A normal host browser often leaks here even with RFP on, because its system locale differs from what RFP reports.
 
 ### Why send DNS to Cloudflare instead of the VPN's own resolver?
 
@@ -225,7 +232,7 @@ interchangeable.
 
 ## Changelog
 
-- 2026-07-21: Added the design notes section. Documented the WebGL choice after testing it enabled against disabled. Described the security review accurately, as an automated `/security-review` in a separate session rather than a third-party audit.
+- 2026-07-21: Added the design notes section, covering the WebGL choice (tested enabled against disabled), locale handling, and why the optional hardening settings are not defaults. Described the security review accurately, as an automated `/security-review` in a separate session rather than a third-party audit.
 - 2026-07-20: First public release.
 
 ## License
