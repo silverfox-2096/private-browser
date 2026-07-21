@@ -8,8 +8,9 @@ Built from three existing images: [Gluetun](https://github.com/qdm12/gluetun) fo
 the VPN and kill switch, [jlesage/firefox](https://github.com/jlesage/docker-firefox)
 for Firefox over a VNC web UI, and Firefox's own `resistFingerprinting`.
 
-> Last verified: 2026-07-20 (Firefox 151, Gluetun v3.40). This is a security
-> tool; if that date looks old, treat it as unverified.
+> Docs & config verified: 2026-07-21 (Firefox 151, Gluetun v3.40).
+> Runtime & leak-tested: 2026-07-20. This is a security tool; if either date
+> looks old, treat it as unverified.
 
 ## What this is, and what it isn't
 
@@ -174,7 +175,9 @@ reminder:
 ```
 
 After any update, re-run the verification checks above (and the CreepJS test if you
-use it), then update the "Last verified" line at the top of this README.
+use it), then update the two "verified" dates at the top of this README: bump
+"Docs & config verified" for wording or config changes, and "Runtime & leak-tested"
+only after re-running the leak and runtime checks.
 
 ## Optional hardening (defense-in-depth)
 
@@ -256,6 +259,7 @@ interchangeable.
 
 ## Changelog
 
+- 2026-07-21: Housekeeping after a follow-up review. Verified the pinned Gluetun digest against the official image on Docker Hub. Removed two dead directories from `.gitignore`, corrected the VNC password note to reflect its 8-character limit, and made `launch.sh` fail with a clear message instead of opening a broken page if the stack does not come up. Split the verification stamp into separate "docs & config" and "runtime & leak-tested" dates.
 - 2026-07-21: Corrected several claims after a documentation review. Removed a non-functional `ENABLE_CLIPBOARD` variable and rewrote the clipboard note (sharing is a built-in, bidirectional web-UI feature with no off-switch). Made downloads honestly ephemeral by removing the non-working persistence mount. Dropped the custom Gluetun healthcheck in favour of the stronger built-in one, removed the unused `:8080` host publish from the default, and pinned Gluetun by digest. Added a troubleshooting note for recovering after a Gluetun restart, a swap caveat on the amnesia claim, and honest wording on the VNC password and the security review's limits.
 - 2026-07-21: Added the design notes section, covering the WebGL choice (tested enabled against disabled), locale handling, and why the optional hardening settings are not defaults. Described the security review accurately, as an automated `/security-review` in a separate session rather than a third-party audit.
 - 2026-07-20: First public release.

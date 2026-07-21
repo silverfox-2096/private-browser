@@ -3,8 +3,6 @@
 
 # Runtime state and data (created at run time)
 gluetun/
-firefox-downloads/
-firefox-config/
 
 # Self-hosted CreepJS build output (optional 'test' profile)
 creepjs/
