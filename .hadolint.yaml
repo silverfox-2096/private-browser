@@ -1,0 +1,12 @@
+# Hadolint config. Each ignore is a documented, deliberate choice -- not an oversight.
+# The rationale lives in README.md ("Optional hardening") and Dockerfile.firefox comments.
+ignored:
+  # FROM jlesage/firefox:latest -- the floating tag is intentional: it pulls base-image
+  # security patches. Pinning by digest is offered as OPTIONAL hardening in the README.
+  - DL3007
+  # apk add without version pins -- pinning is listed as OPTIONAL hardening in the README;
+  # it is not a default because it would hold back font-package security updates.
+  - DL3018
+  # Last USER is root (USER 0) -- required to install fonts. The base image's init drops
+  # to USER_ID (1000) at runtime; see the comment above USER 0 in Dockerfile.firefox.
+  - DL3002

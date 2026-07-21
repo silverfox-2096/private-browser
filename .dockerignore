@@ -1,0 +1,25 @@
+# Keep the Docker build context minimal and, above all, secret-free. The image build
+# (Dockerfile.firefox) COPYs nothing, so almost nothing here needs to reach the daemon.
+
+# Secrets -- must never enter the build context
+.env
+.env.example
+webauth-htpasswd
+
+# Runtime state and optional data
+gluetun/
+creepjs/
+
+# Repo files the font build does not need
+.git/
+.github/
+.gitignore
+.hadolint.yaml
+assets/
+*.md
+LICENSE
+launch.sh
+update.sh
+verify.sh
+nginx-8080.conf
+docker-compose.yml

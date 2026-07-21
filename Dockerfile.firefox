@@ -1,5 +1,10 @@
 # Firefox base + extra fonts, so the container does not stand out with an
 # unusually small font set. Built locally: docker compose build --pull firefox
+#
+# Deliberate findings, suppressed inline with their reasons (see README):
+# checkov:skip=CKV_DOCKER_7:Floating :latest is deliberate, pulls base security patches (README "Optional hardening")
+# checkov:skip=CKV_DOCKER_2:HEALTHCHECK inherited from jlesage base; stack gates on Gluetun's healthcheck (README)
+# checkov:skip=CKV_DOCKER_8:USER 0 required for apk; base image init drops to USER_ID at runtime (Dockerfile comment)
 FROM jlesage/firefox:latest
 
 # USER 0 (numeric) is required -- the base image has no "root" passwd entry, so

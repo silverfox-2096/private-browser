@@ -16,7 +16,7 @@ fi
 docker compose up -d
 # wait for the web UI to respond before opening the browser
 ready=0
-for i in {1..30}; do
+for _ in {1..30}; do
   curl -sk -o /dev/null https://127.0.0.1:7814 && { ready=1; break; }
   sleep 1
 done

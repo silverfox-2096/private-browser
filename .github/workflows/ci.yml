@@ -1,0 +1,99 @@
+# CI: static analysis + image CVE scan for the private-browser stack.
+# One workflow, one badge. It does NOT run verify.sh -- that needs a live VPN key
+# and a running stack (see verify.sh / README).
+#
+# SUPPLY-CHAIN NOTE: the `uses:` actions below are tag-pinned so this runs as-is.
+# Before committing, replace each tag with the action's commit SHA (Releases page)
+# and keep a trailing `# vX.Y.Z` comment. Tools run via `docker run`/`pipx` are
+# version-pinned instead. This keeps the pipeline reproducible.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+  schedule:
+    # Weekly re-scan so the Trivy/CVE badge tracks upstream `:latest` drift even
+    # with no pushes. A red badge here = the floating base picked up a fixable CVE
+    # and `./update.sh` is overdue. Matches the README's monthly-maintenance ethos.
+    - cron: "0 6 * * 1"   # Mondays 06:00 UTC
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4   # pin to SHA before committing
+      - name: ShellCheck (preinstalled on the runner)
+        run: shellcheck launch.sh update.sh verify.sh
+
+  hadolint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4   # pin to SHA before committing
+      - name: Hadolint (via docker run; auto-reads .hadolint.yaml)
+        run: |
+          docker run --rm -v "$PWD:/repo" -w /repo \
+            hadolint/hadolint:v2.12.0 hadolint Dockerfile.firefox
+
+  checkov:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4   # pin to SHA before committing
+      - name: Checkov (Dockerfile only -- Checkov has no docker-compose support)
+        run: |
+          pipx install checkov==3.3.8
+          checkov -d . --framework dockerfile --quiet --compact
+
+  kics:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4   # pin to SHA before committing
+      - name: KICS (docker-compose security scan)
+        # KICS has native docker-compose support (Checkov does not). NOTE: designed,
+        # not yet run in CI -- the FIRST run will surface findings to tune. For the
+        # deliberate ones (NET_ADMIN, the read-write htpasswd mount -- both explained in
+        # the README) add `# kics-scan disable=<queryID>` lines to docker-compose.yml
+        # with a rationale: the compose-side parallel to the Dockerfile #checkov:skip's.
+        # Verify the image tag exists / pin it by digest before committing.
+        run: |
+          docker run --rm -v "$PWD:/path" checkmarx/kics:v2.1.3 \
+            scan -p /path/docker-compose.yml --fail-on high --no-progress
+
+  trivy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15   # image build + two scans is the only job that can hang
+    permissions:
+      contents: read
+      security-events: write   # only this job needs it (SARIF upload)
+    steps:
+      - uses: actions/checkout@v4   # pin to SHA before committing
+      - name: Build the image Trivy will scan
+        run: docker build -f Dockerfile.firefox -t private-firefox:ci .
+      - name: Trivy -- gate on FIXABLE High/Critical only
+        uses: aquasecurity/trivy-action@0.24.0   # pin to SHA before committing
+        with:
+          image-ref: private-firefox:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          format: table
+      - name: Trivy -- full SARIF (all severities, never fails the job)
+        if: always()
+        uses: aquasecurity/trivy-action@0.24.0   # pin to SHA before committing
+        with:
+          image-ref: private-firefox:ci
+          format: sarif
+          output: trivy.sarif
+          exit-code: "0"
+      - name: Upload SARIF to the Security tab (keeps CVEs visible even when green)
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3   # pin to SHA before committing
+        with:
+          sarif_file: trivy.sarif
