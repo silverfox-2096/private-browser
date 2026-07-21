@@ -161,6 +161,44 @@ no vulnerabilities within its scope. If you want to go further, you can add
 to the services, pin the Firefox base image by digest instead of `:latest`, and pin
 the `apk` package versions in `Dockerfile.firefox` for reproducible builds.
 
+## Design notes and anticipated questions
+
+These are the questions a careful reviewer tends to raise. Where a setting looks unusual there is a measured reason, and where a claim can be checked the checks are under [Verify it works](#verify-it-works).
+
+### Why is there no `user.js` with hundreds of tweaks?
+
+The protections that matter come from the architecture rather than a long preference list. The profile is wiped every session (tmpfs), all traffic is forced through the VPN's network namespace, and Firefox's `resistFingerprinting` (RFP) handles most fingerprint normalization. A full arkenfox-style `user.js` was considered and set aside as largely redundant here, since its highest-value settings for disk avoidance, DNS handling, and WebRTC are already delivered by tmpfs, the VPN container, and the shared namespace. Fewer knobs means less to misconfigure or let fall out of date. The prefs that are set (RFP, letterboxing, telemetry off, and turning off link prefetch, speculative connections, and search suggestions) each add something the architecture does not.
+
+### Why are only about 3 fonts detected?
+
+Three is the target. A container with almost no fonts stands out, so the image installs Noto (including emoji and CJK), Liberation, FreeFont, and DejaVu to look like an ordinary Linux desktop. It reports about 3 of the 51 fonts a common probe checks. The other 48 are Windows and macOS families that no Alpine package provides, and installing lookalikes would create inconsistency signals worse than the gap.
+
+### Why is WebGL disabled? Doesn't hiding WebGL make you more unique?
+
+This was tested rather than assumed, because it is a real trade-off.
+
+With RFP on and WebGL enabled, Firefox masks the renderer string to a generic `Mozilla` value, so the underlying software renderer such as `llvmpipe` never leaks, and it randomizes the canvas readback each session. That is the case for leaving WebGL on.
+
+Enabling it also exposes the WebGL capability set, meaning dozens of parameters and extension names, as a stable hash that does not change between sessions. This container renders in software because it has no GPU, so that capability set reflects the software graphics stack and is more likely to differ from a typical hardware-GPU user than to blend in. RFP normalizes the renderer string but leaves this capability list alone.
+
+Disabling WebGL removes that surface. A browser with no WebGL is also a normal posture among privacy-conscious users, since it is what the Tor Browser's "Safer" security level does. A browser running RFP is already identifiable as an RFP browser, so the realistic crowd to blend into is other RFP users, and WebGL-off is common there. Given the choice between a masked renderer that still carries a stable software-capability fingerprint and no WebGL surface at all, disabling exposes less. The cost is that 3D sites and web maps will not render, which is acceptable for this browser.
+
+### Why send DNS to Cloudflare instead of the VPN's own resolver?
+
+The property that matters is encrypted DNS that never touches your ISP, and that holds: queries leave over DNS-over-TLS from inside the tunnel. Routing DNS to the VPN's own resolver would put everything with one provider, which sounds cleaner, but the VPN is already your exit and can see the TLS SNI of the sites you visit, so it learns the destinations either way. The difference is smaller than it looks, and this setup avoids the resolver-restart problems seen with other configurations. If you prefer your provider's resolver, it is a one-line change; re-run the DNS-leak check afterward.
+
+### Is it really amnesic if the downloads folder persists?
+
+Yes. The browser profile, meaning cookies, history, logins, and cache, lives in a RAM-backed tmpfs and is gone the moment you stop the stack. The only things that persist are files you download, in a clearly named folder, and the VPN container's own state, which holds tunnel data rather than browsing. Nothing from the profile is written to disk.
+
+### Doesn't the clipboard bridge weaken the isolation?
+
+A little, and it is a deliberate convenience trade-off. Clipboard sharing is host-to-container only and bound to localhost. To drop it, set `ENABLE_CLIPBOARD: 0`.
+
+### About the independent review
+
+The review covered the configuration in this repository, meaning the compose file, Dockerfile, and scripts, and found no vulnerabilities within that scope. It was not a runtime penetration test. You can check the design yourself: there is no application code, the risk surface is the configuration, and all of it is here to read alongside the verification steps.
+
 ## Related projects
 
 This stack combines well-known parts, and several projects overlap with pieces of it.
@@ -183,6 +221,11 @@ automation. `resistFingerprinting` tries to make you look like every other
 resistFingerprinting user, while an anti-detect browser tries to look like a
 convincing, unique person. Those are opposite goals, so the two are not
 interchangeable.
+
+## Changelog
+
+- 2026-07-21: Added the design notes section. Documented the WebGL choice after testing it enabled against disabled. Reworded the security-review note to state its scope.
+- 2026-07-20: First public release.
 
 ## License
 
