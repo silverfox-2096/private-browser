@@ -32,8 +32,9 @@ AI-assisted repos: the common failure modes (vulnerable auth code, injection,
 insecure endpoints) cannot exist here, because there is no such code. The whole risk surface
 is the configuration, meaning how secrets are handled, which ports are exposed, and
 whether the kill switch holds. That surface is small, it is all visible in
-`docker-compose.yml`, and an independent security review found no vulnerabilities.
-You do not have to take that on faith. Read the compose file, and run the checks
+`docker-compose.yml`, and an independent review of the configuration found no
+vulnerabilities within its scope (the five files in this repo; no runtime
+penetration testing). You do not have to take that on faith. Read the compose file, and run the checks
 under [Verify it works](#verify-it-works) yourself.
 
 ## What it does and doesn't do
@@ -154,8 +155,9 @@ use it), then update the "Last verified" line at the top of this README.
 
 ## Optional hardening (defense-in-depth)
 
-The defaults are already sound; an independent security review found no
-vulnerabilities. If you want to go further, you can add `mem_limit` and `pids_limit`
+The defaults are already sound; an independent review of the configuration found
+no vulnerabilities within its scope. If you want to go further, you can add
+`mem_limit` and `pids_limit`
 to the services, pin the Firefox base image by digest instead of `:latest`, and pin
 the `apk` package versions in `Dockerfile.firefox` for reproducible builds.
 
