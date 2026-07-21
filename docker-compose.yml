@@ -4,7 +4,9 @@
 
 services:
   gluetun:
-    image: qmcgaw/gluetun:v3.40   # pinned on purpose; see README (API changed after v3.40)
+    # Pinned by digest for reproducibility. v3.40 on purpose: the control-server
+    # route changed after v3.40 (see README). Bump the tag and digest together.
+    image: qmcgaw/gluetun:v3.40@sha256:e10584de1f82d8999e5e6c3111901d9d56a2eed21151fb96af060f390bbdfba8
     container_name: gluetun-proton
     restart: unless-stopped
     cap_add:
@@ -23,16 +25,11 @@ services:
       DOT_PROVIDERS: cloudflare
       BLOCK_MALICIOUS: "off"              # ON can break DNS on some providers; see README
       HEALTH_VPN_DURATION_INITIAL: 30s
-    healthcheck:
-      # /v1/openvpn/status is the v3.40 route; it becomes /v1/vpn/status in v3.41+
-      test: ["CMD", "wget", "-qO-", "http://localhost:8000/v1/openvpn/status"]
-      interval: 10s
-      timeout: 5s
-      retries: 6
-      start_period: 30s
+    # No healthcheck override on purpose: Gluetun's built-in healthcheck actually
+    # tests tunnel connectivity. A custom wget against the control server would only
+    # prove the HTTP server is up (it returns 200 even when the tunnel is down).
     ports:
       - "127.0.0.1:7814:5800"   # VNC web UI (localhost only)
-      - "127.0.0.1:8080:8080"   # CreepJS test server (localhost only; 'test' profile)
     volumes:
       - ./gluetun:/gluetun
 
@@ -53,7 +50,6 @@ services:
       TZ: Etc/UTC                    # container logs only; RFP forces the JS-visible TZ to UTC
       USER_ID: 1000
       GROUP_ID: 1000
-      ENABLE_CLIPBOARD: 1
       DISPLAY_WIDTH: 1920
       DISPLAY_HEIGHT: 1080
       SECURE_CONNECTION: 1
@@ -69,14 +65,16 @@ services:
       FF_PREF_PREFETCH: "network.prefetch-next=false"
       FF_PREF_SPECULATE: "network.http.speculative-parallel-limit=0"
       FF_PREF_SEARCHSUGGEST: "browser.search.suggest.enabled=false"
-    volumes:
-      - ./firefox-downloads:/storage
+    # No host volume: downloads land in the tmpfs profile and are wiped on stop,
+    # like the rest of the profile. This is deliberate -- the stack is amnesic.
     tmpfs:
       - "/config:size=512m,uid=1000,gid=1000,mode=0755"   # ephemeral profile; keep the quotes
 
   # Optional self-hosted CreepJS fingerprint tester. Disabled by default.
   # Enable:  docker compose --profile test up -d creepjs
   # Populate ./creepjs/docs with a CreepJS build first (see README).
+  # The container browser reaches it at http://localhost:8080 inside Gluetun's
+  # namespace -- no host port publish is needed for that.
   creepjs:
     image: nginx:alpine
     container_name: creepjs-server

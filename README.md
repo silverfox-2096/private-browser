@@ -17,7 +17,7 @@ Three things to know before you start:
 
 - Privacy, not anonymity. Your ISP, your LAN, and the sites you visit cannot see your real IP, but your VPN provider still can. If you need to be untraceable, use Tor instead.
 - Not a one-click app. It needs Docker and a paid WireGuard VPN (this example uses Proton).
-- Closing it erases everything. Bookmarks, logins, history, and cookies live in RAM and are wiped every time you stop the stack, by design. Downloads are kept.
+- Closing it erases everything. Bookmarks, logins, history, cookies, and downloads all live in RAM and are wiped every time you stop the stack, by design. There is no persistent folder, so save anything you want to keep somewhere off the browser (a cloud drive, email) before you stop it.
 
 ## No application code to audit
 
@@ -77,7 +77,10 @@ service, and everything binds to `127.0.0.1`. Nothing is exposed to your LAN.
    chmod 600 .env
    ```
    Fill in `WIREGUARD_PRIVATE_KEY` and `WIREGUARD_ADDRESSES` from your provider's
-   WireGuard config file, and choose a strong `VNC_PASSWORD`.
+   WireGuard config file, and set a `VNC_PASSWORD`. Note the RFB protocol caps VNC
+   passwords at 8 characters and the value is readable via `docker inspect`; because
+   the UI is bound to localhost only, this gates local access rather than serving as
+   a strong secret.
 2. Optionally, set `SERVER_COUNTRIES` in `docker-compose.yml` to your preferred exit
    country.
 3. Build and start:
@@ -91,9 +94,28 @@ service, and everything binds to `127.0.0.1`. Nothing is exposed to your LAN.
 ## Daily use
 
 Start the stack with `./launch.sh` and stop it with `docker compose down`. Stopping
-wipes the profile (bookmarks, logins, history, cookies) by design; downloads survive
-in `./firefox-downloads/`. The tunnel stays up whenever the stack runs, so remove
-`restart: unless-stopped` from the services if you want it to run only on demand.
+wipes the whole profile (bookmarks, logins, history, cookies, and downloads) by
+design, since it all lives in RAM. Nothing is written to a host folder, so upload
+anything you download to a cloud drive or email before you stop the stack. The tunnel
+stays up whenever the stack runs, so remove `restart: unless-stopped` from the
+services if you want it to run only on demand.
+
+## Troubleshooting
+
+If Gluetun restarts or reconnects (a crash, a `docker restart`, or an image update),
+the Firefox container stays attached to the old, now-dead network namespace. The
+symptom is that the web UI at `https://127.0.0.1:7814` becomes unreachable and the
+browser cannot load anything. This is the kill switch doing its job, Firefox fails
+closed so nothing leaks during the gap, but it does not self-heal, because Firefox
+keeps running and its own restart policy never fires. Reattach it to the live tunnel:
+
+```
+docker restart private-firefox
+```
+
+An auto-restart companion (such as `deunhealth` or `autoheal`) could do this
+automatically, but it would need access to the Docker socket, a larger attack surface
+than this rare, fail-closed event warrants. It is left out on purpose.
 
 ## Verify it works
 
@@ -135,10 +157,10 @@ Changing any of these without reading can break the stack or weaken it. You will
 | `BLOCK_MALICIOUS: "off"` | Turning it on can push Gluetun's DNS resolver into a restart loop on some providers, so DNS stops resolving. Your provider's own malware blocking already covers this. |
 | `FIREWALL_OUTBOUND_SUBNETS: ""` | Blocks LAN access too, which is what makes the kill switch total. |
 | Ports on `gluetun`, `127.0.0.1:` prefix | They have to live on Gluetun (shared namespace) and stay loopback-bound, never exposed to the LAN. |
-| `SECURE_CONNECTION: 1` and `VNC_PASSWORD` | TLS and authentication on the VNC web UI. |
+| `SECURE_CONNECTION: 1` and `VNC_PASSWORD` | TLS and a login on the VNC web UI. The password is capped at 8 characters (RFB) and readable via `docker inspect`; it is loopback-only, so it gates local access rather than acting as a strong secret. |
 | `/config` as a quoted tmpfs, `mode=0755` | Ephemeral profile. Keep the quotes: YAML otherwise strips the leading zero from `0755` and the container will not start. |
 | `webgl.disabled=true` | Removes an identifying WebGL hash. Breaks 3D sites and web maps. |
-| Gluetun pinned to `v3.40` | Update deliberately. In v3.41+ the control-server route `/v1/openvpn/status` becomes `/v1/vpn/status`, so update the healthcheck if you bump the version. |
+| Gluetun pinned to `v3.40` by digest | Update deliberately. The image runs its own healthcheck (it tests tunnel connectivity), so there is no custom healthcheck to maintain. In v3.41+ the control-server route `/v1/openvpn/status` becomes `/v1/vpn/status`; if you bump the version, change the tag and digest together and re-verify health. |
 | Firefox built locally | Adds fonts so you do not stand out with a near-empty font set. One consequence: `docker compose pull` will not update Firefox, so use `./update.sh`. |
 | `FF_OPEN_URL: about:blank` | No third-party call on launch. Set it to `https://ipinfo.io/json` if you want an exit-IP check each start. |
 
@@ -195,17 +217,19 @@ No. RFP reports the language as `en-US` and spoofs the timezone to UTC no matter
 
 The property that matters is encrypted DNS that never touches your ISP, and that holds: queries leave over DNS-over-TLS from inside the tunnel. Routing DNS to the VPN's own resolver would put everything with one provider, which sounds cleaner, but the VPN is already your exit and can see the TLS SNI of the sites you visit, so it learns the destinations either way. The difference is smaller than it looks, and this setup avoids the resolver-restart problems seen with other configurations. If you prefer your provider's resolver, it is a one-line change; re-run the DNS-leak check afterward.
 
-### Is it really amnesic if the downloads folder persists?
+### Is it really amnesic?
 
-Yes. The browser profile, meaning cookies, history, logins, and cache, lives in a RAM-backed tmpfs and is gone the moment you stop the stack. The only things that persist are files you download, in a clearly named folder, and the VPN container's own state, which holds tunnel data rather than browsing. Nothing from the profile is written to disk.
+Yes, fully. The entire browser profile, meaning cookies, history, logins, cache, and downloads, lives in a RAM-backed tmpfs and is gone the moment you stop the stack. There is no persistent downloads folder by design, so anything you fetch is wiped too; save it off the browser first if you need to keep it. The only thing that survives a stop is the VPN container's own state, which holds tunnel data rather than browsing.
+
+One honest caveat: tmpfs pages can be pushed to swap under memory pressure, and on a host with unencrypted swap those fragments can touch disk. If that matters to you, encrypt your swap or turn it off. On a host with encrypted swap this is already covered.
 
 ### Doesn't the clipboard bridge weaken the isolation?
 
-A little, and it is a deliberate convenience trade-off. Clipboard sharing is host-to-container only and bound to localhost. To drop it, set `ENABLE_CLIPBOARD: 0`.
+A little, and it is worth being precise about. Clipboard sharing is a built-in feature of the jlesage/firefox web UI, not something this stack adds, and there is no environment variable to turn it off. Two paths exist: a manual clipboard box in the control panel, and automatic synchronization that activates in Chromium-based viewers served over HTTPS. Both are bidirectional, container to host as well as host to container, so treat the clipboard as a real channel in both directions. It is reachable only over the loopback-bound web UI, so nothing on your LAN can touch it. If that channel matters to you, do not paste through the control panel, and view the UI in a browser that does not trigger the automatic sync.
 
 ### About the security review
 
-The configuration was checked with an automated security review, Claude Code's `/security-review`, run in a separate session over the files in this repository. It reported no vulnerabilities within that scope. This is not a third-party human audit or a runtime penetration test. You can check the design yourself: there is no application code, the risk surface is the configuration, and all of it is here to read alongside the verification steps.
+The configuration was checked with an automated security review, Claude Code's `/security-review`, run in a separate session over the files in this repository. It reported no vulnerabilities within that scope. This is not a third-party human audit or a runtime penetration test. No automated review is a guarantee: a later review of these docs caught claims this one missed, an environment variable that did nothing and a downloads folder that did not actually persist, both since corrected. Treat it as one input, not a seal of approval, and check the design yourself: there is no application code, the risk surface is the configuration, and all of it is here to read alongside the verification steps.
 
 ## Related projects
 
@@ -232,6 +256,7 @@ interchangeable.
 
 ## Changelog
 
+- 2026-07-21: Corrected several claims after a documentation review. Removed a non-functional `ENABLE_CLIPBOARD` variable and rewrote the clipboard note (sharing is a built-in, bidirectional web-UI feature with no off-switch). Made downloads honestly ephemeral by removing the non-working persistence mount. Dropped the custom Gluetun healthcheck in favour of the stronger built-in one, removed the unused `:8080` host publish from the default, and pinned Gluetun by digest. Added a troubleshooting note for recovering after a Gluetun restart, a swap caveat on the amnesia claim, and honest wording on the VNC password and the security review's limits.
 - 2026-07-21: Added the design notes section, covering the WebGL choice (tested enabled against disabled), locale handling, and why the optional hardening settings are not defaults. Described the security review accurately, as an automated `/security-review` in a separate session rather than a third-party audit.
 - 2026-07-20: First public release.
 
