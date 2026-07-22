@@ -1,12 +1,14 @@
 # Private Browser (VPN-tunneled, fingerprint-hardened)
 
+![CI](https://github.com/silverfox-2096/private-browser/actions/workflows/ci.yml/badge.svg)
+
 Firefox in a Docker container whose only network path is a WireGuard VPN tunnel.
 If the tunnel drops, the browser has no route anywhere, not even to your LAN. The
 profile lives in RAM and is wiped every time you stop the stack.
 
-Built from three existing images: [Gluetun](https://github.com/qdm12/gluetun) for
-the VPN and kill switch, [jlesage/firefox](https://github.com/jlesage/docker-firefox)
-for Firefox over a VNC web UI, and Firefox's own `resistFingerprinting`.
+Built from two existing images: [Gluetun](https://github.com/qdm12/gluetun) for
+the VPN and kill switch and [jlesage/firefox](https://github.com/jlesage/docker-firefox)
+for Firefox over a VNC web UI, plus Firefox's own `resistFingerprinting`.
 
 > Docs & config verified: 2026-07-21 (Firefox 151, Gluetun v3.40).
 > Runtime & leak-tested: 2026-07-21. This is a security tool; if either date
@@ -38,6 +40,31 @@ whether the kill switch holds. That surface is small, it is all visible in
 vulnerabilities within that scope. That is not a third-party audit, so do not take
 it on faith. Read the compose file, and run the checks under
 [Verify it works](#verify-it-works) yourself.
+
+## Continuous checks
+
+Every push, pull request, and a weekly schedule run a CI pipeline you can inspect
+yourself under the Actions tab. It is not a one-time review:
+
+- **ShellCheck** on `launch.sh`, `update.sh`, and `verify.sh`.
+- **Hadolint** on `Dockerfile.firefox`.
+- **Checkov** on `Dockerfile.firefox`. The findings that are deliberate design choices
+  (the floating base tag, no HEALTHCHECK, no build-time `USER` — the base image drops
+  privileges at runtime) are suppressed inline with a comment citing the reason, so the
+  pass is honest rather than silent.
+- **KICS** on `docker-compose.yml` — the compose file is the actual risk surface here,
+  so it is machine-scanned too (Checkov has no docker-compose support). It currently
+  passes with no high-severity findings.
+- **Trivy** builds the image and scans it for CVEs. It fails only on *fixable*
+  High/Critical vulnerabilities, so a red badge means the floating base image picked up
+  a patchable CVE and `./update.sh` is due. All findings, fixable or not, are published
+  to the repository's Security tab.
+
+Two honesty notes. CI scans an image built from `:latest` *at scan time*, so your
+locally built image is only as fresh as your last `./update.sh` — a green badge tracks
+the upstream base, not your machine. And CI cannot run `verify.sh`: the leak tests need
+a live VPN key and a running tunnel, neither of which belongs in a public runner, so
+they stay a local step you run yourself (see [Verify it works](#verify-it-works)).
 
 ## What it does and doesn't do
 
@@ -136,12 +163,32 @@ docker exec gluetun-proton wget -qO- https://ipinfo.io/json
 
 # kill switch: stop the tunnel, the browser must lose all connectivity
 docker stop gluetun-proton      # UI shows "Reconnecting..."
-docker compose up -d
+docker compose up -d            # bring the tunnel back
+docker restart private-firefox  # reattach Firefox to the new namespace
 ```
+
+The `docker restart private-firefox` at the end is required: after Gluetun comes
+back it holds a fresh network namespace, and Firefox stays bound to the dead one
+until it is restarted (see [Troubleshooting](#troubleshooting)). Without it the
+browser stays stuck on "Reconnecting...".
 
 In the container browser, also confirm there is no WebRTC leak (browserleaks.com/webrtc
 should report "No Leak" with a blank local IP) and no DNS leak (the extended test at
 dnsleaktest.com should show your DoT resolver, never your ISP).
+
+The container-network checks above are automated in `verify.sh` (exit-IP, DNS resolver,
+and a two-sided kill-switch test). The kill-switch test briefly stops the tunnel and
+restarts Firefox, so run it between browsing sessions, not during one. On the host with
+the stack up:
+
+```
+./verify.sh          # or ./verify.sh SG to also assert the exit country
+```
+
+It cannot test in-browser WebRTC or the browser-side DNS-leak page — those need a real
+browser and stay manual, above. A recent run is recorded in `VERIFY-OUTPUT.md`; commit
+only a passing run — a failing exit-IP check prints your real host IP verbatim, so a
+failed transcript would publish exactly what this stack exists to hide.
 
 ## Optional: self-hosted fingerprint test (CreepJS)
 
@@ -267,6 +314,7 @@ interchangeable.
 
 ## Changelog
 
+- 2026-07-21: Added a CI pipeline (ShellCheck, Hadolint, Checkov on the Dockerfile, KICS on the compose file, Trivy image CVE scan) that runs on every push and weekly, with a status badge. Deliberate scanner findings are suppressed inline with their rationale. Simplified `Dockerfile.firefox` to build as the base image's default root user, removing an explicit `USER 0` that failed under strict container runtimes. Added `verify.sh`, which automates the container-network verification checks, and published a sample run in `VERIFY-OUTPUT.md`.
 - 2026-07-21: Replaced the VNC password with jlesage's `WEB_AUTHENTICATION`, an HTTPS login page backed by a bcrypt htpasswd file that you generate on the host and that is gitignored. This removes the 8-character RFB cap and keeps the credential out of `docker inspect`. Dropped `VNC_PASSWORD` (the web login is the only prompt now), mounted the credential file read-write (the image chmods it on startup), and added a `launch.sh` guard that refuses to start if the file is missing.
 - 2026-07-21: Housekeeping after a follow-up review. Verified the pinned Gluetun digest against the official image on Docker Hub. Removed two dead directories from `.gitignore`, corrected the VNC password note to reflect its 8-character limit, and made `launch.sh` fail with a clear message instead of opening a broken page if the stack does not come up. Split the verification stamp into separate "docs & config" and "runtime & leak-tested" dates.
 - 2026-07-21: Corrected several claims after a documentation review. Removed a non-functional `ENABLE_CLIPBOARD` variable and rewrote the clipboard note (sharing is a built-in, bidirectional web-UI feature with no off-switch). Made downloads honestly ephemeral by removing the non-working persistence mount. Dropped the custom Gluetun healthcheck in favour of the stronger built-in one, removed the unused `:8080` host publish from the default, and pinned Gluetun by digest. Added a troubleshooting note for recovering after a Gluetun restart, a swap caveat on the amnesia claim, and honest wording on the VNC password and the security review's limits.
