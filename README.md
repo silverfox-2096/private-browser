@@ -56,9 +56,12 @@ yourself under the Actions tab. It is not a one-time review:
   so it is machine-scanned too (Checkov has no docker-compose support). It currently
   passes with no high-severity findings.
 - **Trivy** builds the image and scans it for CVEs. It fails only on *fixable*
-  High/Critical vulnerabilities, so a red badge means the floating base image picked up
-  a patchable CVE and `./update.sh` is due. All findings, fixable or not, are published
-  to the repository's Security tab.
+  High/Critical vulnerabilities, so a red badge means a patchable CVE is present.
+  Run `./update.sh` first; that clears it whenever the upstream base has been rebuilt
+  with the fix. When the base image lags its own distro, the base refresh alone is not
+  enough, and the affected packages are re-added in `Dockerfile.firefox` so the build
+  pulls the current Alpine builds. All findings, fixable or not, are published to the
+  repository's Security tab.
 
 Two honesty notes. CI scans an image built from `:latest` *at scan time*, so your
 locally built image is only as fresh as your last `./update.sh` — a green badge tracks
@@ -314,6 +317,7 @@ interchangeable.
 
 ## Changelog
 
+- 2026-09-01: Monthly upkeep. Re-ran the leak battery (exit IP, WebRTC, DNS leak, kill switch), all passing, and moved the runtime verification date. Trivy then failed on five fixable High-severity CVEs in `openssl` and `libexpat`, all denial-of-service issues, inherited from a base image that had not been rebuilt since Alpine published the fixes. Running `./update.sh` did not clear them, so `Dockerfile.firefox` now upgrades `openssl` and `libexpat` explicitly with `apk add --upgrade`. A plain `apk add` was tried first and did nothing: apk treats an already-installed package as satisfied and skips it. Corrected the CI section, which described a base-image refresh as the only remedy for a red Trivy badge.
 - 2026-07-21: Added a CI pipeline (ShellCheck, Hadolint, Checkov on the Dockerfile, KICS on the compose file, Trivy image CVE scan) that runs on every push and weekly, with a status badge. Deliberate scanner findings are suppressed inline with their rationale. Simplified `Dockerfile.firefox` to build as the base image's default root user, removing an explicit `USER 0` that failed under strict container runtimes. Added `verify.sh`, which automates the container-network verification checks, and published a sample run in `VERIFY-OUTPUT.md`.
 - 2026-07-21: Replaced the VNC password with jlesage's `WEB_AUTHENTICATION`, an HTTPS login page backed by a bcrypt htpasswd file that you generate on the host and that is gitignored. This removes the 8-character RFB cap and keeps the credential out of `docker inspect`. Dropped `VNC_PASSWORD` (the web login is the only prompt now), mounted the credential file read-write (the image chmods it on startup), and added a `launch.sh` guard that refuses to start if the file is missing.
 - 2026-07-21: Housekeeping after a follow-up review. Verified the pinned Gluetun digest against the official image on Docker Hub. Removed two dead directories from `.gitignore`, corrected the VNC password note to reflect its 8-character limit, and made `launch.sh` fail with a clear message instead of opening a broken page if the stack does not come up. Split the verification stamp into separate "docs & config" and "runtime & leak-tested" dates.

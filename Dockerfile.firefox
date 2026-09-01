@@ -12,7 +12,15 @@ FROM jlesage/firefox:latest
 # USER of its own) and has no uid-0 entry in /etc/passwd, so an explicit `USER 0` or
 # `USER root` fails under strict runc ("unable to find user 0"). Building as the default
 # root is portable; the base's s6 init still drops to USER_ID at runtime.
-RUN apk add --no-cache \
+
+# openssl and libexpat are re-added here so the build pulls the current Alpine build of
+# each. The floating base tag only delivers patches when the base itself is rebuilt, and
+# it can lag its own distro. The --upgrade flag is required: a plain apk add is a no-op
+# for an already-installed package (measured 2026-09-01). It is apk add --upgrade, not
+# the apk upgrade command that Hadolint DL3017 rejects. See the 2026-09-01 changelog.
+RUN apk add --no-cache --upgrade \
+      openssl \
+      libexpat \
       font-noto \
       font-noto-emoji \
       font-noto-cjk \
