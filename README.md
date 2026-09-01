@@ -11,7 +11,7 @@ the VPN and kill switch and [jlesage/firefox](https://github.com/jlesage/docker-
 for Firefox over a VNC web UI, plus Firefox's own `resistFingerprinting`.
 
 > Docs & config verified: 2026-07-21 (Firefox 151, Gluetun v3.40).
-> Runtime & leak-tested: 2026-07-21. This is a security tool; if either date
+> Runtime & leak-tested: 2026-09-01. This is a security tool; if either date
 > looks old, treat it as unverified.
 
 ## What this is, and what it isn't
