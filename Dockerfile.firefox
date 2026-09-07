@@ -3,7 +3,7 @@
 #
 # Deliberate findings, suppressed inline with their reasons (see README):
 # checkov:skip=CKV_DOCKER_7:Floating :latest is deliberate, pulls base security patches (README "Optional hardening")
-# checkov:skip=CKV_DOCKER_2:HEALTHCHECK inherited from jlesage base; stack gates on Gluetun's healthcheck (README)
+# checkov:skip=CKV_DOCKER_2:No HEALTHCHECK; the base declares none either (checked 2026-09-07), the stack gates on Gluetun's (README)
 # checkov:skip=CKV_DOCKER_3:No build-time USER by design; base has no uid-0 passwd entry, s6 init drops to USER_ID at runtime (README)
 # checkov:skip=CKV_DOCKER_8:No explicit root USER declared; runtime user is USER_ID via the base image's init (README)
 FROM jlesage/firefox:latest
@@ -13,14 +13,21 @@ FROM jlesage/firefox:latest
 # `USER root` fails under strict runc ("unable to find user 0"). Building as the default
 # root is portable; the base's s6 init still drops to USER_ID at runtime.
 
-# openssl and libexpat are re-added here so the build pulls the current Alpine build of
-# each. The floating base tag only delivers patches when the base itself is rebuilt, and
-# it can lag its own distro. The --upgrade flag is required: a plain apk add is a no-op
-# for an already-installed package (measured 2026-09-01). It is apk add --upgrade, not
-# the apk upgrade command that Hadolint DL3017 rejects. See the 2026-09-01 changelog.
-RUN apk add --no-cache --upgrade \
-      openssl \
-      libexpat \
+# Blanket upgrade of every installed package, then the fonts. Replaces the earlier
+# hand-picked `apk add --upgrade openssl libexpat` (2026-09-01): that only patched the
+# two packages named that day, so the next fixable Alpine CVE in any other package turned
+# CI red again -- which is exactly what happened on 2026-09-07 (libblkid/libmount,
+# util-linux 2.42.1-r0 -> 2.42.3-r1, 14 fixable HIGH). The floating base tag only delivers
+# patches when jlesage rebuilds, and that has not happened since 2026-07-13, so the base
+# cannot be relied on to close these.
+#
+# On the DL3017 ignore below: that rule forbids `apk upgrade` because it makes a pinned base
+# non-reproducible. This base is deliberately unpinned (see DL3007 in .hadolint.yaml), so
+# the rule is arguing against a property this image does not have. Upgrading everything is
+# the only thing that keeps the Trivy gate green without a new commit per CVE.
+# hadolint ignore=DL3017
+RUN apk upgrade --no-cache \
+    && apk add --no-cache \
       font-noto \
       font-noto-emoji \
       font-noto-cjk \
