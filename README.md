@@ -252,8 +252,10 @@ use it), then update the two "verified" dates at the top of this README: bump
 "Docs & config verified" for wording or config changes, and "Runtime & leak-tested"
 only after re-running the leak and runtime checks.
 
-Dependabot pull requests get the same treatment: check out the branch, run
-`./update.sh` and `./verify.sh`, and merge only if both pass.
+Dependabot pull requests that change `Dockerfile.firefox` or `docker-compose.yml`
+get the same treatment: check out the branch, run `./update.sh` and `./verify.sh`,
+and merge only if both pass. Pull requests that only touch CI tooling (`.github/`,
+`ci/pins/`) can merge on green CI.
 
 ## Optional hardening (defense-in-depth)
 
