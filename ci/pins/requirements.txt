@@ -1,2 +1,2 @@
 # Checkov version for the CI checkov job (pipx install); bumped by Dependabot (pip).
-checkov==3.3.8
+checkov==3.3.17
