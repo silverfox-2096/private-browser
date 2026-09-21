@@ -40,7 +40,14 @@ updates:
       time: "04:00"
     cooldown:
       default-days: 7
+      # node:22-slim is re-pushed every few days, so it never ages past the
+      # cooldown; exempt it or its digest is never refreshed.
+      exclude: ["node"]
     ignore:
+      # Node majors are bumped by hand to the next LTS line (even numbers). With
+      # the cooldown, Dependabot proposed node 25, an odd, end-of-life line.
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
       # Built locally from Dockerfile.firefox; not on any registry.
       - dependency-name: private-firefox
       # Held at v3.40 on purpose: v3.41 renames the control-server route
