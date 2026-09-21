@@ -7,11 +7,12 @@ If the tunnel drops, the browser has no route anywhere, not even to your LAN. Th
 profile lives in RAM and is wiped every time you stop the stack.
 
 Built from two existing images: [Gluetun](https://github.com/qdm12/gluetun) for
-the VPN and kill switch and [jlesage/firefox](https://github.com/jlesage/docker-firefox)
-for Firefox over a VNC web UI, plus Firefox's own `resistFingerprinting`.
+the VPN and kill switch and jlesage's [GUI base image](https://github.com/jlesage/docker-baseimage-gui)
+for a VNC web UI, with Firefox installed from Mozilla's own APT repository and
+hardened with Firefox's own `resistFingerprinting`.
 
-> Docs & config verified: 2026-07-21 (Firefox 151, Gluetun v3.40).
-> Runtime & leak-tested: 2026-09-01. This is a security tool; if either date
+> Docs & config verified: 2026-09-21 (Firefox 156, Gluetun v3.40).
+> Runtime & leak-tested: 2026-09-21. This is a security tool; if either date
 > looks old, treat it as unverified.
 
 ## What this is, and what it isn't
@@ -26,8 +27,8 @@ Three things to know before you start:
 
 This repository has no application code to audit or trust. It is a Docker Compose
 file that wires together three existing, independently maintained images (Gluetun,
-jlesage/firefox, and nginx), plus a short Dockerfile that installs a few fonts and
-two small shell scripts. None of it runs custom logic on your data, opens a service
+jlesage's GUI base, and nginx), plus a Dockerfile that installs Mozilla's Firefox
+and a few fonts, and two small shell scripts. None of it runs custom logic on your data, opens a service
 written for this project, or parses untrusted input.
 
 That is deliberate, and it removes the usual worry about quickly assembled or
@@ -49,7 +50,7 @@ yourself under the Actions tab. It is not a one-time review:
 - **ShellCheck** on `launch.sh`, `update.sh`, and `verify.sh`.
 - **Hadolint** on `Dockerfile.firefox`.
 - **Checkov** on `Dockerfile.firefox`. The findings that are deliberate design choices
-  (the floating base tag, no HEALTHCHECK, no build-time `USER` — the base image drops
+  (no HEALTHCHECK, no build-time `USER` — the base image drops
   privileges at runtime) are suppressed inline with a comment citing the reason, so the
   pass is honest rather than silent.
 - **KICS** on `docker-compose.yml` — the compose file is the actual risk surface here,
@@ -57,14 +58,12 @@ yourself under the Actions tab. It is not a one-time review:
   passes with no high-severity findings.
 - **Trivy** builds the image and scans it for CVEs. It fails only on *fixable*
   High/Critical vulnerabilities, so a red badge means a patchable CVE is present.
-  `Dockerfile.firefox` upgrades every installed package at build time, so each
-  rebuild picks up whatever Alpine has already published and a fix no longer needs
-  a commit naming the package. Run `./update.sh` when you want the base layer
-  itself refreshed. A badge that stays red after a rebuild means the fix has not
-  reached the Alpine branch yet, and nothing in this repo can close it. All
+  `./update.sh` rebuilds from the current base image and the current Mozilla
+  release. A badge that stays red after a rebuild means the fix has not reached
+  jlesage's base image or Debian yet, and nothing in this repo can close it. All
   findings, fixable or not, are published to the repository's Security tab.
 
-Two honesty notes. CI scans an image built from `:latest` *at scan time*, so your
+Two honesty notes. CI scans an image built *at scan time*, so your
 locally built image is only as fresh as your last `./update.sh` — a green badge tracks
 the upstream base, not your machine. And CI cannot run `verify.sh`: the leak tests need
 a live VPN key and a running tunnel, neither of which belongs in a public runner, so
@@ -221,7 +220,8 @@ Changing any of these without reading can break the stack or weaken it. You will
 | `/config` as a quoted tmpfs, `mode=0755` | Ephemeral profile. Keep the quotes: YAML otherwise strips the leading zero from `0755` and the container will not start. |
 | `webgl.disabled=true` | Removes an identifying WebGL hash. Breaks 3D sites and web maps. |
 | Gluetun pinned to `v3.40` by digest | Update deliberately. The image runs its own healthcheck (it tests tunnel connectivity), so there is no custom healthcheck to maintain. In v3.41+ the control-server route `/v1/openvpn/status` becomes `/v1/vpn/status`; if you bump the version, change the tag and digest together and re-verify health. |
-| Firefox built locally | Adds fonts so you do not stand out with a near-empty font set. One consequence: `docker compose pull` will not update Firefox, so use `./update.sh`. |
+| Firefox built locally | Installs Firefox from Mozilla's own APT repository (the signing key is checked against Mozilla's published fingerprint at build time) and adds fonts so you do not stand out with a near-empty font set. One consequence: `docker compose pull` will not update Firefox, so use `./update.sh`. |
+| Safe Browsing, built-in VPN, sponsored New Tab off | Mozilla's own build ships Google Safe Browsing keys, a built-in VPN button, and sponsored New Tab content. All three are switched off in `docker-compose.yml`; see the design notes. |
 | `FF_OPEN_URL: about:blank` | No third-party call on launch. Set it to `https://ipinfo.io/json` if you want an exit-IP check each start. |
 
 ## Maintenance
@@ -230,7 +230,7 @@ This is a security tool, and a stale one gives false confidence. Set a monthly
 reminder:
 
 ```
-./update.sh          # rebuilds Firefox from the latest base and updates nginx
+./update.sh          # rebuilds with the current Firefox release and base image, updates nginx
 ```
 
 After any update, re-run the verification checks above (and the CreepJS test if you
@@ -243,11 +243,11 @@ only after re-running the leak and runtime checks.
 The defaults are already sound, and the automated review noted above reported no
 vulnerabilities within its scope. If you want to go further, you can add
 `mem_limit` and `pids_limit`
-to the services, pin the Firefox base image by digest instead of `:latest`, and pin
-the `apk` package versions in `Dockerfile.firefox` for reproducible builds. These are
-left optional on purpose. A memory limit on a browser can kill tabs under load, and
-pinning the Firefox base by digest would hold back the security patches the floating
-tag pulls in. Add them when your situation calls for it.
+to the services, pin the base images by digest, and pin the package versions in
+`Dockerfile.firefox` for reproducible builds. These are left optional on purpose. A
+memory limit on a browser can kill tabs under load, and pinning would hold back the
+security patches and Firefox releases each rebuild pulls in. Add them when your
+situation calls for it.
 
 ## Design notes and anticipated questions
 
@@ -255,11 +255,15 @@ These are the questions a careful reviewer tends to raise. Where a setting looks
 
 ### Why is there no `user.js` with hundreds of tweaks?
 
-The protections that matter come from the architecture rather than a long preference list. The profile is wiped every session (tmpfs), all traffic is forced through the VPN's network namespace, and Firefox's `resistFingerprinting` (RFP) handles most fingerprint normalization. A full arkenfox-style `user.js` was considered and set aside as largely redundant here, since its highest-value settings for disk avoidance, DNS handling, and WebRTC are already delivered by tmpfs, the VPN container, and the shared namespace. Fewer knobs means less to misconfigure or let fall out of date. The prefs that are set (RFP, letterboxing, telemetry off, and turning off link prefetch, speculative connections, and search suggestions) each add something the architecture does not.
+The protections that matter come from the architecture rather than a long preference list. The profile is wiped every session (tmpfs), all traffic is forced through the VPN's network namespace, and Firefox's `resistFingerprinting` (RFP) handles most fingerprint normalization. A full arkenfox-style `user.js` was considered and set aside as largely redundant here, since its highest-value settings for disk avoidance, DNS handling, and WebRTC are already delivered by tmpfs, the VPN container, and the shared namespace. Fewer knobs means less to misconfigure or let fall out of date. The prefs that are set (RFP, letterboxing, telemetry off, and turning off link prefetch, speculative connections, and search suggestions) each add something the architecture does not. The rest switch off features Mozilla's own build adds: Google Safe Browsing, the built-in VPN button, and sponsored New Tab content.
 
 ### Why are only about 3 fonts detected?
 
-Three is the target. A container with almost no fonts stands out, so the image installs Noto (including emoji and CJK), Liberation, FreeFont, and DejaVu to look like an ordinary Linux desktop. It reports about 3 of the 51 fonts a common probe checks. The other 48 are Windows and macOS families that no Alpine package provides, and installing lookalikes would create inconsistency signals worse than the gap.
+Three is the target. A container with almost no fonts stands out, so the image installs Noto (including emoji and CJK), Liberation, FreeFont, and DejaVu to look like an ordinary Linux desktop. It reports about 3 of the 51 fonts a common probe checks. Debian's Noto package adds four rarer script families that the probe also lists (Canadian Aboriginal, Gunjala Gondi, Masaram Gondi, Yezidi), so the Dockerfile removes them; with them the probe saw 7. The other 48 are Windows and macOS families that no Debian package provides, and installing lookalikes would create inconsistency signals worse than the gap.
+
+### Why is Safe Browsing off?
+
+Mozilla's own Firefox build ships Google Safe Browsing keys, so with the defaults it downloads Google's malware and phishing lists and can send details of some downloaded files to Google for a verdict. Those requests would still go through the VPN, but they are a standing connection to Google that this stack otherwise does not make. They are switched off, which also means no built-in phishing or malware blocklist. If you want that protection back, remove the three `FF_PREF_SB_*` lines from `docker-compose.yml`.
 
 ### Why is WebGL disabled? Doesn't hiding WebGL make you more unique?
 
@@ -287,7 +291,7 @@ One honest caveat: tmpfs pages can be pushed to swap under memory pressure, and 
 
 ### Doesn't the clipboard bridge weaken the isolation?
 
-A little, and it is worth being precise about. Clipboard sharing is a built-in feature of the jlesage/firefox web UI, not something this stack adds, and there is no environment variable to turn it off. Two paths exist: a manual clipboard box in the control panel, and automatic synchronization that activates in Chromium-based viewers served over HTTPS. Both are bidirectional, container to host as well as host to container, so treat the clipboard as a real channel in both directions. It is reachable only over the loopback-bound web UI, so nothing on your LAN can touch it. If that channel matters to you, do not paste through the control panel, and view the UI in a browser that does not trigger the automatic sync.
+A little, and it is worth being precise about. Clipboard sharing is a built-in feature of jlesage's web UI, not something this stack adds, and there is no environment variable to turn it off. Two paths exist: a manual clipboard box in the control panel, and automatic synchronization that activates in Chromium-based viewers served over HTTPS. Both are bidirectional, container to host as well as host to container, so treat the clipboard as a real channel in both directions. It is reachable only over the loopback-bound web UI, so nothing on your LAN can touch it. If that channel matters to you, do not paste through the control panel, and view the UI in a browser that does not trigger the automatic sync.
 
 ### About the security review
 
@@ -318,6 +322,7 @@ interchangeable.
 
 ## Changelog
 
+- 2026-09-21: Firefox now comes from Mozilla. The previous base image, `jlesage/firefox`, pins Alpine's Firefox package, which Alpine's stable branch had left at 151.0.3 while Mozilla shipped 156. The image is now built on jlesage's Debian GUI base with Firefox from Mozilla's own APT repository; the build refuses to continue unless Mozilla's signing key matches its published fingerprint. jlesage's launcher and `FF_PREF_*` handling are copied from a pinned `jlesage/firefox` release, so the environment variables and web UI are unchanged. Mozilla's build brings Google Safe Browsing, a built-in VPN button, and sponsored New Tab content, all switched off in the compose file. Added system FFmpeg (without it, Firefox's answers to media-type probes changed between page loads) and removed four Noto font families that raised the detected font count from 3 to 7. `update.sh` now rebuilds without the layer cache so new Firefox releases are actually picked up. Re-ran the leak battery (exit IP, WebRTC, DNS leak, kill switch) and the CreepJS audit: all passing, fonts back to 3 of 51.
 - 2026-09-07: The weekly scan went red on fourteen fixable High-severity issues in the util-linux libraries `libblkid` and `libmount`, inherited from the same base image that has not been rebuilt since July. The 1 September approach — naming each affected package in `Dockerfile.firefox` — would need a fresh commit for every future CVE, so the build now upgrades every installed package instead. Hadolint's rule against `apk upgrade` is suppressed inline with its reason: that rule protects a pinned base image, and this one is deliberately unpinned. Checked locally before pushing — both scanners pass, the scan reports zero findings, and the upgraded image still starts. Also corrected a stale note claiming the image inherits a HEALTHCHECK from its base; it does not, and the stack has always gated on Gluetun's healthcheck instead.
 - 2026-09-01: Monthly upkeep. Re-ran the leak battery (exit IP, WebRTC, DNS leak, kill switch), all passing, and moved the runtime verification date. Trivy then failed on five fixable High-severity CVEs in `openssl` and `libexpat`, all denial-of-service issues, inherited from a base image that had not been rebuilt since Alpine published the fixes. Running `./update.sh` did not clear them, so `Dockerfile.firefox` now upgrades `openssl` and `libexpat` explicitly with `apk add --upgrade`. A plain `apk add` was tried first and did nothing: apk treats an already-installed package as satisfied and skips it. Corrected the CI section, which described a base-image refresh as the only remedy for a red Trivy badge.
 - 2026-07-21: Added a CI pipeline (ShellCheck, Hadolint, Checkov on the Dockerfile, KICS on the compose file, Trivy image CVE scan) that runs on every push and weekly, with a status badge. Deliberate scanner findings are suppressed inline with their rationale. Simplified `Dockerfile.firefox` to build as the base image's default root user, removing an explicit `USER 0` that failed under strict container runtimes. Added `verify.sh`, which automates the container-network verification checks, and published a sample run in `VERIFY-OUTPUT.md`.

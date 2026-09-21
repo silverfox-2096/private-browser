@@ -37,7 +37,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.firefox
-    image: private-firefox:fonts
+    image: private-firefox:mozilla
     container_name: private-firefox
     restart: unless-stopped
     depends_on:
@@ -65,6 +65,17 @@ services:
       FF_PREF_PREFETCH: "network.prefetch-next=false"
       FF_PREF_SPECULATE: "network.http.speculative-parallel-limit=0"
       FF_PREF_SEARCHSUGGEST: "browser.search.suggest.enabled=false"
+      # Mozilla's own build ships Google Safe Browsing keys. Switched off here
+      # (see README design notes, "Why is Safe Browsing off?").
+      FF_PREF_SB_MALWARE: "browser.safebrowsing.malware.enabled=false"
+      FF_PREF_SB_PHISHING: "browser.safebrowsing.phishing.enabled=false"
+      FF_PREF_SB_DOWNLOADS: "browser.safebrowsing.downloads.enabled=false"
+      # Mozilla's built-in VPN button; the tunnel here is Gluetun.
+      FF_PREF_IPPROTECTION: "browser.ipProtection.enabled=false"
+      # Blank New Tab: no sponsored tiles or widgets.
+      FF_PREF_NEWTAB: "browser.newtabpage.enabled=false"
+      FF_PREF_SPONSORED: "browser.newtabpage.activity-stream.showSponsored=false"
+      FF_PREF_SPONSORED_TOPSITES: "browser.newtabpage.activity-stream.showSponsoredTopSites=false"
     # No persistent profile volume: downloads land in the tmpfs profile and are wiped
     # on stop, like the rest of the profile. This is deliberate -- the stack is amnesic.
     # (The webauth-htpasswd mount below is a single credential file, not profile data.)

@@ -1,9 +1,7 @@
 # Hadolint config. Each ignore is a documented, deliberate choice -- not an oversight.
 # The rationale lives in README.md ("Optional hardening") and Dockerfile.firefox comments.
 ignored:
-  # FROM jlesage/firefox:latest -- the floating tag is intentional: it pulls base-image
-  # security patches. Pinning by digest is offered as OPTIONAL hardening in the README.
-  - DL3007
-  # apk add without version pins -- pinning is listed as OPTIONAL hardening in the README;
-  # it is not a default because it would hold back font-package security updates.
-  - DL3018
+  # apt-get install without version pins, in the throwaway key-verification stage
+  # only. Pinning curl/gnupg there would hold back their security updates and buys
+  # nothing: the stage is discarded and its one output is checked by fingerprint.
+  - DL3008

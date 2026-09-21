@@ -1,38 +1,86 @@
-# Firefox base + extra fonts, so the container does not stand out with an
-# unusually small font set. Built locally: docker compose build --pull firefox
+# Mozilla-built Firefox on jlesage's Debian GUI base, plus fonts so the container
+# does not stand out with an unusually small font set. Firefox comes from Mozilla's
+# own APT repo, so each rebuild tracks the current Mozilla release rather than a
+# distro package. Built locally: ./update.sh (docker compose build --pull --no-cache).
 #
 # Deliberate findings, suppressed inline with their reasons (see README):
-# checkov:skip=CKV_DOCKER_7:Floating :latest is deliberate, pulls base security patches (README "Optional hardening")
-# checkov:skip=CKV_DOCKER_2:No HEALTHCHECK; the base declares none either (checked 2026-09-07), the stack gates on Gluetun's (README)
-# checkov:skip=CKV_DOCKER_3:No build-time USER by design; base has no uid-0 passwd entry, s6 init drops to USER_ID at runtime (README)
+# checkov:skip=CKV_DOCKER_2:No HEALTHCHECK; the stack gates on Gluetun's healthcheck instead (README)
+# checkov:skip=CKV_DOCKER_3:No build-time USER by design; the base's s6 init drops to USER_ID at runtime (README)
 # checkov:skip=CKV_DOCKER_8:No explicit root USER declared; runtime user is USER_ID via the base image's init (README)
-FROM jlesage/firefox:latest
 
-# No explicit USER: the jlesage/Alpine base builds as root by default (it declares no
-# USER of its own) and has no uid-0 entry in /etc/passwd, so an explicit `USER 0` or
-# `USER root` fails under strict runc ("unable to find user 0"). Building as the default
-# root is portable; the base's s6 init still drops to USER_ID at runtime.
+# Source of the container glue copied at the end (launcher, profile init,
+# FF_PREF_* handler). Pinned to a release tag so the copied scripts do not move.
+FROM jlesage/firefox:v26.08.3 AS jlfirefox
 
-# Blanket upgrade of every installed package, then the fonts. Replaces the earlier
-# hand-picked `apk add --upgrade openssl libexpat` (2026-09-01): that only patched the
-# two packages named that day, so the next fixable Alpine CVE in any other package turned
-# CI red again -- which is exactly what happened on 2026-09-07 (libblkid/libmount,
-# util-linux 2.42.1-r0 -> 2.42.3-r1, 14 fixable HIGH). The floating base tag only delivers
-# patches when jlesage rebuilds, and that has not happened since 2026-07-13, so the base
-# cannot be relied on to close these.
-#
-# On the DL3017 ignore below: that rule forbids `apk upgrade` because it makes a pinned base
-# non-reproducible. This base is deliberately unpinned (see DL3007 in .hadolint.yaml), so
-# the rule is arguing against a property this image does not have. Upgrading everything is
-# the only thing that keeps the Trivy gate green without a new commit per CVE.
-# hadolint ignore=DL3017
-RUN apk upgrade --no-cache \
-    && apk add --no-cache \
-      font-noto \
-      font-noto-emoji \
-      font-noto-cjk \
-      ttf-dejavu \
-      ttf-liberation \
-      ttf-freefont \
-      font-terminus \
+# Fetch Mozilla's APT signing key and refuse to continue unless its fingerprint
+# matches the one Mozilla publishes. This stage is discarded after the build.
+FROM debian:13-slim AS mozkey
+ARG MOZ_KEY_FPR=35BAA0B33E9EB396F59CA838C0BA5CE6DC6315A3
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
+    && rm -rf /var/lib/apt/lists/*
+RUN curl -fsSL https://packages.mozilla.org/apt/repo-signing-key.gpg -o /moz.asc
+RUN gpg --batch --with-colons --import-options show-only --import /moz.asc \
+       > /moz.txt 2>&1; cat /moz.txt; \
+    grep -q "^fpr:*${MOZ_KEY_FPR}:" /moz.txt \
+    && echo "Mozilla key fingerprint OK"
+
+FROM jlesage/baseimage-gui:debian-13-v4.14.0
+
+# Mozilla's APT repo, pinned above Debian so `firefox` can only come from it.
+COPY --from=mozkey /moz.asc /etc/apt/keyrings/packages.mozilla.org.asc
+RUN echo "deb [signed-by=/etc/apt/keyrings/packages.mozilla.org.asc] https://packages.mozilla.org/apt mozilla main" \
+       > /etc/apt/sources.list.d/mozilla.list \
+    && printf 'Package: *\nPin: origin packages.mozilla.org\nPin-Priority: 1000\n' \
+       > /etc/apt/preferences.d/mozilla
+
+# ca-certificates first: the Mozilla repo is HTTPS-only.
+RUN add-pkg ca-certificates \
+    && add-pkg \
+      firefox \
+      libpulse0 \
+      libnotify4 \
+      adwaita-icon-theme \
+      xdotool \
+      # System FFmpeg. Without it Firefox's answers to media-type probes drift
+      # between page loads, which is itself a fingerprint.
+      libavcodec61 \
+      # Used by verify.sh's kill-switch probe.
+      wget \
+      fonts-noto-core \
+      fonts-noto-color-emoji \
+      fonts-noto-cjk \
+      fonts-dejavu-core \
+      fonts-liberation \
+      fonts-freefont-ttf \
+      fonts-terminus \
+    # Debian's Noto package includes four families a common fingerprint probe
+    # detects (it lists them among its 51). Removing them keeps the detected set
+    # at the three a typical Linux desktop shows; see README "about 3 fonts".
+    && rm -f /usr/share/fonts/truetype/noto/NotoSansCanadianAboriginal-*.ttf \
+             /usr/share/fonts/truetype/noto/NotoSansGunjalaGondi-*.ttf \
+             /usr/share/fonts/truetype/noto/NotoSansMasaramGondi-*.ttf \
+             /usr/share/fonts/truetype/noto/NotoSerifYezidi-*.ttf \
     && fc-cache -f
+
+# Container glue reused from jlesage/firefox (MIT, (c) Jocelyn Le Sage):
+# app launcher, profile/log init, FF_PREF_* handler, default prefs, window
+# rules, and the static membarrier check the launcher calls.
+COPY --from=jlfirefox /startapp.sh /startapp.sh
+COPY --from=jlfirefox /etc/cont-init.d/55-firefox.sh /etc/cont-init.d/
+COPY --from=jlfirefox /etc/cont-init.d/56-firefox-set-prefs-from-env.sh /etc/cont-init.d/
+COPY --from=jlfirefox /etc/cont-env.d/ /etc/cont-env.d/
+COPY --from=jlfirefox /etc/services.d/app/ /etc/services.d/app/
+COPY --from=jlfirefox /etc/openbox/main-window-selection.xml /etc/openbox/
+COPY --from=jlfirefox /usr/lib/firefox/browser/defaults/preferences/firefox-branding.js /usr/lib/firefox/browser/defaults/preferences/
+COPY --from=jlfirefox /usr/bin/membarrier_check /usr/bin/
+# jlesage ships /etc/machine-id as a symlink to /config/machine-id (created by
+# 55-firefox.sh at start); COPY follows it and fails, so recreate the link.
+RUN ln -sf /config/machine-id /etc/machine-id
+
+RUN set-cont-env APP_NAME "Firefox" \
+    && set-cont-env APP_VERSION "$(dpkg-query -W -f '${Version}' firefox)"
+
+ENV FF_OPEN_URL= \
+    FF_KIOSK=0 \
+    FF_CUSTOM_ARGS=

@@ -13,9 +13,9 @@ on:
   push:
   pull_request:
   schedule:
-    # Weekly re-scan so the Trivy/CVE badge tracks upstream `:latest` drift even
-    # with no pushes. A red badge here = the floating base picked up a fixable CVE
-    # and `./update.sh` is overdue. Matches the README's monthly-maintenance ethos.
+    # Weekly re-scan so the Trivy/CVE badge tracks upstream drift (base image,
+    # Debian, Mozilla) even with no pushes. A red badge here = a fixable CVE has
+    # appeared and `./update.sh` is overdue. Matches the README's monthly-maintenance ethos.
     - cron: "0 6 * * 1"   # Mondays 06:00 UTC
 
 permissions:
