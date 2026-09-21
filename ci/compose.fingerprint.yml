@@ -1,0 +1,25 @@
+# Used only by ci/fingerprint.sh. Runs the browser WITHOUT the VPN, on a plain bridge
+# network, to check what the image + the compose prefs show to a web page.
+# Never browse with this: there is no tunnel and no kill switch.
+#
+# Separate image tag, container names and project name (-p pbfp), so a local run
+# never touches a real stack or its private-firefox:mozilla image.
+services:
+  firefox:
+    image: private-firefox:ci
+    container_name: pbfp-firefox
+    network_mode: bridge
+    depends_on: !reset {}
+    restart: "no"
+    environment:
+      WEB_AUTHENTICATION: 0          # nobody opens the web UI here; no htpasswd needed
+    volumes: !reset []
+
+  creepjs:
+    container_name: pbfp-creepjs
+    network_mode: "service:firefox"  # the browser reaches it at localhost:8080, as in the real stack
+    depends_on: !reset {}
+    restart: "no"
+    volumes: !override
+      - ./ci/creepjs-docs:/usr/share/nginx/html:ro
+      - ./nginx-8080.conf:/etc/nginx/conf.d/default.conf:ro

@@ -1,6 +1,7 @@
 # CI: static analysis + image CVE scan for the private-browser stack.
 # One workflow, one badge. It does NOT run verify.sh -- that needs a live VPN key
-# and a running stack (see verify.sh / README).
+# and a running stack (see verify.sh / README). The fingerprint job runs the browser
+# without the VPN, so it checks what a page sees, never what leaks.
 #
 # SUPPLY-CHAIN NOTE: the `uses:` actions below are pinned to full commit SHAs
 # (with a trailing `# vX.Y.Z` comment for readability). Tools run via
@@ -31,7 +32,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683   # v4.2.2
       - name: ShellCheck (preinstalled on the runner)
-        run: shellcheck launch.sh update.sh verify.sh
+        run: shellcheck launch.sh update.sh verify.sh ci/fingerprint.sh
 
   hadolint:
     runs-on: ubuntu-latest
@@ -97,3 +98,21 @@ jobs:
         uses: github/codeql-action/upload-sarif@08d09a53f0f5d694f253bd25732e4429c9e9337f   # v3
         with:
           sarif_file: trivy.sarif
+
+  fingerprint:
+    # What the image + compose prefs show a web page: UA, RFP time zone, WebGL off,
+    # Safe Browsing prefs off, CreepJS fields vs ci/creep-baseline.json. No VPN key
+    # needed; the browser runs on a plain bridge network (ci/compose.fingerprint.yml).
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683   # v4.2.2
+      - name: Fingerprint checks (headless Firefox + self-hosted CreepJS)
+        run: bash ci/fingerprint.sh
+      - name: Keep the raw CreepJS output when a check fails
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a   # v7.0.1
+        with:
+          name: fingerprint-out
+          path: ci/out/
+          if-no-files-found: ignore

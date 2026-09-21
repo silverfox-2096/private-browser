@@ -47,7 +47,7 @@ it on faith. Read the compose file, and run the checks under
 Every push, pull request, and a weekly schedule run a CI pipeline you can inspect
 yourself under the Actions tab. It is not a one-time review:
 
-- **ShellCheck** on `launch.sh`, `update.sh`, and `verify.sh`.
+- **ShellCheck** on `launch.sh`, `update.sh`, `verify.sh`, and `ci/fingerprint.sh`.
 - **Hadolint** on `Dockerfile.firefox`.
 - **Checkov** on `Dockerfile.firefox`. The findings that are deliberate design choices
   (no HEALTHCHECK, no build-time `USER` — the base image drops
@@ -62,10 +62,18 @@ yourself under the Actions tab. It is not a one-time review:
   release. A badge that stays red after a rebuild means the fix has not reached
   jlesage's base image or Debian yet, and nothing in this repo can close it. All
   findings, fixable or not, are published to the repository's Security tab.
+- **Fingerprint** builds the image, starts it without the VPN, and drives a headless
+  copy of the browser against a self-hosted, pinned CreepJS. It fails if the user agent
+  stops matching the installed Firefox, the time zone is not the one
+  `resistFingerprinting` reports, WebGL comes back, the Safe Browsing prefs are not
+  off, or CreepJS's font list, WebGL, time zone or CPU-core fields drift from
+  `ci/creep-baseline.json`. It compares those fields one by one, never the overall
+  fingerprint ID, which also moves with headless mode and window size. Run it locally
+  with `bash ci/fingerprint.sh`.
 
 Two honesty notes. CI scans an image built *at scan time*, so your
 locally built image is only as fresh as your last `./update.sh` — a green badge tracks
-the upstream base, not your machine. And CI cannot run `verify.sh`: the leak tests need
+the upstream base, not your machine. And CI cannot run `verify.sh`, and the fingerprint job runs without a tunnel: the leak tests need
 a live VPN key and a running tunnel, neither of which belongs in a public runner, so
 they stay a local step you run yourself (see [Verify it works](#verify-it-works)).
 
@@ -322,6 +330,7 @@ interchangeable.
 
 ## Changelog
 
+- 2026-09-21: Added a CI fingerprint job (`ci/fingerprint.sh`): headless Firefox against a pinned, self-hosted CreepJS, compared field by field with a recorded baseline, plus a check that the Safe Browsing prefs are off. It needs no VPN key, so it runs on every push and on the weekly schedule; the leak tests still run only locally.
 - 2026-09-21: Firefox now comes from Mozilla. The previous base image, `jlesage/firefox`, pins Alpine's Firefox package, which Alpine's stable branch had left at 151.0.3 while Mozilla shipped 156. The image is now built on jlesage's Debian GUI base with Firefox from Mozilla's own APT repository; the build refuses to continue unless Mozilla's signing key matches its published fingerprint. jlesage's launcher and `FF_PREF_*` handling are copied from a pinned `jlesage/firefox` release, so the environment variables and web UI are unchanged. Mozilla's build brings Google Safe Browsing, a built-in VPN button, and sponsored New Tab content, all switched off in the compose file. Added system FFmpeg (without it, Firefox's answers to media-type probes changed between page loads) and removed four Noto font families that raised the detected font count from 3 to 7. `update.sh` now rebuilds without the layer cache so new Firefox releases are actually picked up. Re-ran the leak battery (exit IP, WebRTC, DNS leak, kill switch) and the CreepJS audit: all passing, fonts back to 3 of 51.
 - 2026-09-07: The weekly scan went red on fourteen fixable High-severity issues in the util-linux libraries `libblkid` and `libmount`, inherited from the same base image that has not been rebuilt since July. The 1 September approach — naming each affected package in `Dockerfile.firefox` — would need a fresh commit for every future CVE, so the build now upgrades every installed package instead. Hadolint's rule against `apk upgrade` is suppressed inline with its reason: that rule protects a pinned base image, and this one is deliberately unpinned. Checked locally before pushing — both scanners pass, the scan reports zero findings, and the upgraded image still starts. Also corrected a stale note claiming the image inherits a HEALTHCHECK from its base; it does not, and the stack has always gated on Gluetun's healthcheck instead.
 - 2026-09-01: Monthly upkeep. Re-ran the leak battery (exit IP, WebRTC, DNS leak, kill switch), all passing, and moved the runtime verification date. Trivy then failed on five fixable High-severity CVEs in `openssl` and `libexpat`, all denial-of-service issues, inherited from a base image that had not been rebuilt since Alpine published the fixes. Running `./update.sh` did not clear them, so `Dockerfile.firefox` now upgrades `openssl` and `libexpat` explicitly with `apk add --upgrade`. A plain `apk add` was tried first and did nothing: apk treats an already-installed package as satisfied and skips it. Corrected the CI section, which described a base-image refresh as the only remedy for a red Trivy badge.

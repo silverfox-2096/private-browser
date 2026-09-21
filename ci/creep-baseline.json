@@ -1,0 +1,6 @@
+{
+  "fonts": ["DejaVu Sans", "Liberation Mono", "Noto Color Emoji"],
+  "webglBlocked": true,
+  "timezone": "Atlantic, Reykjavik",
+  "cores": 4
+}

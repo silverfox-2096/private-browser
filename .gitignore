@@ -7,3 +7,7 @@ gluetun/
 
 # Self-hosted CreepJS build output (optional 'test' profile)
 creepjs/
+
+# CI fingerprint job (ci/fingerprint.sh): downloaded CreepJS page + results
+ci/creepjs-docs/
+ci/out/

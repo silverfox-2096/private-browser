@@ -22,4 +22,5 @@ launch.sh
 update.sh
 verify.sh
 nginx-8080.conf
+ci/
 docker-compose.yml
