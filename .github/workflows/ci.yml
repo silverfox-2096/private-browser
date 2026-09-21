@@ -31,14 +31,14 @@ jobs:
   shellcheck:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683   # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
       - name: ShellCheck (preinstalled on the runner)
         run: shellcheck launch.sh update.sh verify.sh ci/fingerprint.sh
 
   hadolint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683   # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
       - name: Hadolint (via docker run; auto-reads .hadolint.yaml)
         run: |
           img=$(sed -n 's/^ *image: *\(hadolint\/.*\)/\1/p' ci/pins/compose.yml)
@@ -48,7 +48,7 @@ jobs:
   checkov:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683   # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
       - name: Checkov (Dockerfile only -- Checkov has no docker-compose support)
         run: |
           pipx install "$(grep -x 'checkov==[0-9.]*' ci/pins/requirements.txt)"
@@ -57,7 +57,7 @@ jobs:
   kics:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683   # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
       - name: KICS (docker-compose security scan)
         # KICS has native docker-compose support (Checkov does not). Passes clean today;
         # for any deliberate future finding (e.g. NET_ADMIN, the read-write htpasswd mount
@@ -76,7 +76,7 @@ jobs:
       contents: read
       security-events: write   # only this job needs it (SARIF upload)
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683   # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
       - name: Build the image Trivy will scan
         run: docker build -f Dockerfile.firefox -t private-firefox:ci .
       - name: Trivy -- gate on FIXABLE High/Critical only
@@ -97,7 +97,7 @@ jobs:
           exit-code: "0"
       - name: Upload SARIF to the Security tab (keeps CVEs visible even when green)
         if: always()
-        uses: github/codeql-action/upload-sarif@08d09a53f0f5d694f253bd25732e4429c9e9337f   # v3.37.2
+        uses: github/codeql-action/upload-sarif@b96794f015dfd88f77b49b1c93e0fa7110f94c63   # v4.38.0
         with:
           sarif_file: trivy.sarif
 
@@ -108,7 +108,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683   # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
       - name: Fingerprint checks (headless Firefox + self-hosted CreepJS)
         run: bash ci/fingerprint.sh
       - name: Keep the raw CreepJS output when a check fails
