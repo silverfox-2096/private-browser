@@ -18,6 +18,7 @@ FF=pbfp-firefox
 out="$PWD/ci/out"
 
 dc() { docker compose -p pbfp -f docker-compose.yml -f ci/compose.fingerprint.yml "$@"; }
+# shellcheck disable=SC2317  # called via trap, which shellcheck cannot follow
 cleanup() { dc --profile test down >/dev/null 2>&1 || true; }
 trap cleanup EXIT
 
