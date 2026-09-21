@@ -1,0 +1,61 @@
+# Weekly pin-bump PRs. Nothing auto-merges: green CI covers static checks, the CVE
+# scan and the fingerprint job, but not the leak tests (exit IP, DNS, WebRTC, kill
+# switch), which need the VPN key and run only locally (verify.sh).
+# Not covered here: the CreepJS commit in ci/fingerprint.sh has no releases and is
+# the measuring instrument for ci/creep-baseline.json, so it is bumped by hand
+# together with a re-recorded baseline.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:00"
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # Dockerfile.firefox: jlesage/firefox (glue scripts) and jlesage/baseimage-gui
+  # move together, so they share one PR.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:00"
+    cooldown:
+      default-days: 7
+    groups:
+      base-images:
+        patterns: ["*"]
+
+  - package-ecosystem: docker-compose
+    directories: ["/", "/ci/pins"]
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:00"
+    cooldown:
+      default-days: 7
+    ignore:
+      # Built locally from Dockerfile.firefox; not on any registry.
+      - dependency-name: private-firefox
+      # Held at v3.40 on purpose: v3.41 renames the control-server route
+      # (README, "Gluetun pinned to v3.40"). Same-tag digest refreshes still come.
+      - dependency-name: qmcgaw/gluetun
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+    groups:
+      images:
+        patterns: ["*"]
+
+  - package-ecosystem: pip
+    directory: /ci/pins
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:00"
+    cooldown:
+      default-days: 7

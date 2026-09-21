@@ -13,7 +13,7 @@ set -euo pipefail
 
 cd "$(dirname "$(readlink -f "$0")")/.."
 CREEPJS_SHA=10aa6724cd33a1015db1574211890518cd04f0cc   # abrahamjuliot/creepjs master, 2026-06-11
-NODE_IMG=node:22-slim@sha256:48e4b67d85f87bd551df43704e24d252f56cc5f8e9718841aace50f19948f0f9
+NODE_IMG=$(sed -n 's/^ *image: *\(node:.*\)/\1/p' ci/pins/compose.yml)   # Dependabot-bumped
 FF=pbfp-firefox
 out="$PWD/ci/out"
 
@@ -21,6 +21,8 @@ dc() { docker compose -p pbfp -f docker-compose.yml -f ci/compose.fingerprint.ym
 # shellcheck disable=SC2317  # called via trap, which shellcheck cannot follow
 cleanup() { dc --profile test down >/dev/null 2>&1 || true; }
 trap cleanup EXIT
+
+: "${NODE_IMG:?no node pin in ci/pins/compose.yml}"
 
 echo "1/5 CreepJS $CREEPJS_SHA (its repo ships the built page in docs/)"
 if [ ! -f ci/creepjs-docs/creep.js ]; then

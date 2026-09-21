@@ -70,6 +70,12 @@ yourself under the Actions tab. It is not a one-time review:
   `ci/creep-baseline.json`. It compares those fields one by one, never the overall
   fingerprint ID, which also moves with headless mode and window size. Run it locally
   with `bash ci/fingerprint.sh`.
+- **Dependabot** opens weekly pull requests for the pinned versions: the Actions
+  SHAs, the two jlesage images in `Dockerfile.firefox`, the Gluetun digest, and the CI
+  tools listed in `ci/pins/`. Nothing merges automatically, because green CI does not
+  include the leak tests. Gluetun stays on `v3.40` (see Design decisions); only digest
+  refreshes of that tag are proposed. The CreepJS commit is bumped by hand, with a
+  re-recorded baseline.
 
 Two honesty notes. CI scans an image built *at scan time*, so your
 locally built image is only as fresh as your last `./update.sh` — a green badge tracks
@@ -246,6 +252,9 @@ use it), then update the two "verified" dates at the top of this README: bump
 "Docs & config verified" for wording or config changes, and "Runtime & leak-tested"
 only after re-running the leak and runtime checks.
 
+Dependabot pull requests get the same treatment: check out the branch, run
+`./update.sh` and `./verify.sh`, and merge only if both pass.
+
 ## Optional hardening (defense-in-depth)
 
 The defaults are already sound, and the automated review noted above reported no
@@ -330,6 +339,7 @@ interchangeable.
 
 ## Changelog
 
+- 2026-09-21: Added Dependabot (`.github/dependabot.yml`): weekly, grouped pull requests for GitHub Actions, the Dockerfile base images, the compose images, and the CI tool versions, which moved into `ci/pins/` so Dependabot can read them. No auto-merge. Corrected the CodeQL action's version comment from `v3` to `v3.37.2` so updates rewrite it.
 - 2026-09-21: Added a CI fingerprint job (`ci/fingerprint.sh`): headless Firefox against a pinned, self-hosted CreepJS, compared field by field with a recorded baseline, plus a check that the Safe Browsing prefs are off. It needs no VPN key, so it runs on every push and on the weekly schedule; the leak tests still run only locally.
 - 2026-09-21: Firefox now comes from Mozilla. The previous base image, `jlesage/firefox`, pins Alpine's Firefox package, which Alpine's stable branch had left at 151.0.3 while Mozilla shipped 156. The image is now built on jlesage's Debian GUI base with Firefox from Mozilla's own APT repository; the build refuses to continue unless Mozilla's signing key matches its published fingerprint. jlesage's launcher and `FF_PREF_*` handling are copied from a pinned `jlesage/firefox` release, so the environment variables and web UI are unchanged. Mozilla's build brings Google Safe Browsing, a built-in VPN button, and sponsored New Tab content, all switched off in the compose file. Added system FFmpeg (without it, Firefox's answers to media-type probes changed between page loads) and removed four Noto font families that raised the detected font count from 3 to 7. `update.sh` now rebuilds without the layer cache so new Firefox releases are actually picked up. Re-ran the leak battery (exit IP, WebRTC, DNS leak, kill switch) and the CreepJS audit: all passing, fonts back to 3 of 51.
 - 2026-09-07: The weekly scan went red on fourteen fixable High-severity issues in the util-linux libraries `libblkid` and `libmount`, inherited from the same base image that has not been rebuilt since July. The 1 September approach — naming each affected package in `Dockerfile.firefox` — would need a fresh commit for every future CVE, so the build now upgrades every installed package instead. Hadolint's rule against `apk upgrade` is suppressed inline with its reason: that rule protects a pinned base image, and this one is deliberately unpinned. Checked locally before pushing — both scanners pass, the scan reports zero findings, and the upgraded image still starts. Also corrected a stale note claiming the image inherits a HEALTHCHECK from its base; it does not, and the stack has always gated on Gluetun's healthcheck instead.
