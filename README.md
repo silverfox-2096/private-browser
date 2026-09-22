@@ -1,6 +1,8 @@
 # Private Browser (VPN-tunneled, fingerprint-hardened)
 
 ![CI](https://github.com/silverfox-2096/private-browser/actions/workflows/ci.yml/badge.svg)
+![License](https://img.shields.io/github/license/silverfox-2096/private-browser)
+![Last commit](https://img.shields.io/github/last-commit/silverfox-2096/private-browser)
 
 Firefox in a Docker container whose only network path is a WireGuard VPN tunnel.
 If the tunnel drops, the browser has no route anywhere, not even to your LAN. The
