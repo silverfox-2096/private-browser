@@ -35,7 +35,7 @@ written for this project, or parses untrusted input.
 
 The configuration, scripts and documentation were written with Claude Code (AI) and reviewed by me.
 
-That is deliberate, and it removes the usual worry about quickly assembled or
+Having no code is deliberate, and it removes the usual worry about quickly assembled or
 AI-assisted repos: the common failure modes (vulnerable auth code, injection,
 insecure endpoints) cannot exist here, because there is no such code. The whole risk surface
 is the configuration, meaning how secrets are handled, which ports are exposed, and
