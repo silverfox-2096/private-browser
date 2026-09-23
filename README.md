@@ -33,6 +33,8 @@ jlesage's GUI base, and nginx), plus a Dockerfile that installs Mozilla's Firefo
 and a few fonts, and two small shell scripts. None of it runs custom logic on your data, opens a service
 written for this project, or parses untrusted input.
 
+The configuration, scripts and documentation were written with Claude Code (AI) and reviewed by me.
+
 That is deliberate, and it removes the usual worry about quickly assembled or
 AI-assisted repos: the common failure modes (vulnerable auth code, injection,
 insecure endpoints) cannot exist here, because there is no such code. The whole risk surface
