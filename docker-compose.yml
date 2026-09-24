@@ -24,6 +24,11 @@ services:
       DNS_SERVER: "on"
       DNS_UPSTREAM_RESOLVERS: cloudflare
       BLOCK_MALICIOUS: "off"              # ON can break DNS on some providers; see README
+      # Control server (:8000): Gluetun v3.41 leaves some routes open by default,
+      # including PUT /v1/vpn/status (stops the VPN). This role puts EVERY route behind
+      # an API key from .env; nothing in this stack calls the API. Per its source, an empty key
+      # makes Gluetun refuse to start (fails closed). See README Setup.
+      HTTP_CONTROL_SERVER_AUTH_DEFAULT_ROLE: '{"auth":"apikey","apikey":"${GLUETUN_API_KEY}"}'
     # No healthcheck override on purpose: Gluetun's built-in healthcheck actually
     # tests tunnel connectivity. A custom wget against the control server would only
     # prove the HTTP server is up (it returns 200 even when the tunnel is down).
@@ -53,6 +58,7 @@ services:
       DISPLAY_HEIGHT: 1080
       SECURE_CONNECTION: 1
       WEB_AUTHENTICATION: 1          # HTTPS login page; bcrypt creds in webauth-htpasswd (see below)
+      VNC_LISTENING_PORT: "-1"       # no raw VNC port (:5900 had no password); web UI is unaffected
       FF_OPEN_URL: about:blank       # set to https://ipinfo.io/json for an IP check on launch
       # Hardening is intentionally minimal: RFP + the tmpfs/namespace architecture do the
       # work here, not a long user.js. See the README design notes.
