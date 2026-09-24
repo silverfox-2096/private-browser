@@ -13,8 +13,8 @@ the VPN and kill switch and jlesage's [GUI base image](https://github.com/jlesag
 for a VNC web UI, with Firefox installed from Mozilla's own APT repository and
 hardened with Firefox's own `resistFingerprinting`.
 
-> Docs & config verified: 2026-09-21 (Firefox 156, Gluetun v3.40).
-> Runtime & leak-tested: 2026-09-21. This is a security tool; if either date
+> Docs & config verified: 2026-09-24 (Firefox 156, Gluetun v3.41.3).
+> Runtime & leak-tested: 2026-09-24. This is a security tool; if either date
 > looks old, treat it as unverified.
 
 ## What this is, and what it isn't
@@ -77,9 +77,9 @@ yourself under the Actions tab. It is not a one-time review:
 - **Dependabot** opens weekly pull requests for the pinned versions: the Actions
   SHAs, the two jlesage images in `Dockerfile.firefox`, the Gluetun digest, and the CI
   tools listed in `ci/pins/`. Nothing merges automatically, because green CI does not
-  include the leak tests. Gluetun stays on `v3.40` (see Design decisions); only digest
-  refreshes of that tag are proposed. The CreepJS commit is bumped by hand, with a
-  re-recorded baseline.
+  include the leak tests. For Gluetun only patch releases are proposed; minor
+  versions are bumped by hand (see Design decisions). The CreepJS commit is bumped
+  by hand, with a re-recorded baseline.
 
 Two honesty notes. CI scans an image built *at scan time*, so your
 locally built image is only as fresh as your last `./update.sh` — a green badge tracks
@@ -237,7 +237,7 @@ Changing any of these without reading can break the stack or weaken it. You will
 | `SECURE_CONNECTION: 1` and `WEB_AUTHENTICATION: 1` | TLS plus an HTTPS login page for the web UI. Credentials are a bcrypt hash in a host-mounted `webauth-htpasswd` file, so they are not plaintext and not readable via `docker inspect`. This replaces the older `VNC_PASSWORD` (capped at 8 characters, exposed via `docker inspect`). The file is mounted read-write because the image's init sets its permissions at startup; note this is the one host file the browser container can write, so a compromised container could rewrite the hash (worst case: lock you out, or persist its own login to the loopback UI) — a minor channel an attacker already inside the container gains little from. |
 | `/config` as a quoted tmpfs, `mode=0755` | Ephemeral profile. Keep the quotes: YAML otherwise strips the leading zero from `0755` and the container will not start. |
 | `webgl.disabled=true` | Removes an identifying WebGL hash. Breaks 3D sites and web maps. |
-| Gluetun pinned to `v3.40` by digest | Update deliberately. The image runs its own healthcheck (it tests tunnel connectivity), so there is no custom healthcheck to maintain. In v3.41+ the control-server route `/v1/openvpn/status` becomes `/v1/vpn/status`; if you bump the version, change the tag and digest together and re-verify health. |
+| Gluetun pinned by digest | Update deliberately. Minor versions can rename settings (v3.41 renamed the `DOT*` DNS options), so they are bumped by hand; change the tag and digest together, then re-run the leak tests. The image runs its own healthcheck (it tests tunnel connectivity), so there is no custom healthcheck to maintain. |
 | Firefox built locally | Installs Firefox from Mozilla's own APT repository (the signing key is checked against Mozilla's published fingerprint at build time) and adds fonts so you do not stand out with a near-empty font set. One consequence: `docker compose pull` will not update Firefox, so use `./update.sh`. |
 | Safe Browsing, built-in VPN, sponsored New Tab off | Mozilla's own build ships Google Safe Browsing keys, a built-in VPN button, and sponsored New Tab content. All three are switched off in `docker-compose.yml`; see the design notes. |
 | `FF_OPEN_URL: about:blank` | No third-party call on launch. Set it to `https://ipinfo.io/json` if you want an exit-IP check each start. |
@@ -345,6 +345,7 @@ interchangeable.
 
 ## Changelog
 
+- 2026-09-24: Updated Gluetun from v3.40.4 to v3.41.3, pinned by digest. v3.41 renamed the DNS settings, so `DOT` and `DOT_PROVIDERS` are now `DNS_SERVER` and `DNS_UPSTREAM_RESOLVERS` (the old names still work in v3.41). Removed `HEALTH_VPN_DURATION_INITIAL`, which v3.41 no longer reads. Dependabot now proposes Gluetun patch releases; minor versions stay manual. Re-ran the leak battery (exit IP, WebRTC, DNS leak, kill switch): all passing.
 - 2026-09-21: Added Dependabot (`.github/dependabot.yml`): weekly, grouped pull requests for GitHub Actions, the Dockerfile base images, the compose images, and the CI tool versions, which moved into `ci/pins/` so Dependabot can read them. No auto-merge. Corrected the CodeQL action's version comment from `v3` to `v3.37.2` so updates rewrite it.
 - 2026-09-21: Added a CI fingerprint job (`ci/fingerprint.sh`): headless Firefox against a pinned, self-hosted CreepJS, compared field by field with a recorded baseline, plus a check that the Safe Browsing prefs are off. It needs no VPN key, so it runs on every push and on the weekly schedule; the leak tests still run only locally.
 - 2026-09-21: Firefox now comes from Mozilla. The previous base image, `jlesage/firefox`, pins Alpine's Firefox package, which Alpine's stable branch had left at 151.0.3 while Mozilla shipped 156. The image is now built on jlesage's Debian GUI base with Firefox from Mozilla's own APT repository; the build refuses to continue unless Mozilla's signing key matches its published fingerprint. jlesage's launcher and `FF_PREF_*` handling are copied from a pinned `jlesage/firefox` release, so the environment variables and web UI are unchanged. Mozilla's build brings Google Safe Browsing, a built-in VPN button, and sponsored New Tab content, all switched off in the compose file. Added system FFmpeg (without it, Firefox's answers to media-type probes changed between page loads) and removed four Noto font families that raised the detected font count from 3 to 7. `update.sh` now rebuilds without the layer cache so new Firefox releases are actually picked up. Re-ran the leak battery (exit IP, WebRTC, DNS leak, kill switch) and the CreepJS audit: all passing, fonts back to 3 of 51.

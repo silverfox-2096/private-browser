@@ -50,8 +50,8 @@ updates:
         update-types: ["version-update:semver-major"]
       # Built locally from Dockerfile.firefox; not on any registry.
       - dependency-name: private-firefox
-      # Held at v3.40 on purpose: v3.41 renames the control-server route
-      # (README, "Gluetun pinned to v3.40"). Same-tag digest refreshes still come.
+      # Minor and major versions are bumped by hand, since they can rename
+      # settings (README, "Gluetun pinned by digest"). Patch releases still come.
       - dependency-name: qmcgaw/gluetun
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
     groups:
