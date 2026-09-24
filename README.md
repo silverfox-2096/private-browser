@@ -21,37 +21,47 @@ hardened with Firefox's own `resistFingerprinting`.
 
 Three things to know before you start:
 
-- Privacy, not anonymity. Your ISP, your LAN, and the sites you visit cannot see your real IP, but your VPN provider still can. If you need to be untraceable, use Tor instead.
+- Privacy, not anonymity. Sites you visit see the VPN's exit IP, not yours. Your ISP and your LAN see that you use a VPN and when, but not where this browser goes or what it sends. Your VPN provider sees both your real IP and your destinations. If you need to be untraceable, use Tor instead. Details per observer: [What it does and doesn't do](#what-it-does-and-doesnt-do).
 - Not a one-click app. It needs Docker and a paid WireGuard VPN (this example uses Proton).
 - Closing it erases everything. Bookmarks, logins, history, cookies, and downloads all live in RAM and are wiped every time you stop the stack, by design. There is no persistent folder, so save anything you want to keep somewhere off the browser (a cloud drive, email) before you stop it.
 
-## No application code to audit
+## No custom service code
 
-This repository has no application code to audit or trust. It is a Docker Compose
+Nothing written for this project runs as a service. The stack is a Docker Compose
 file that wires together three existing, independently maintained images (Gluetun,
 jlesage's GUI base, and nginx), plus a Dockerfile that installs Mozilla's Firefox
-and a few fonts, and two small shell scripts. None of it runs custom logic on your data, opens a service
-written for this project, or parses untrusted input.
+and a few fonts.
+
+The repository does contain code of its own, all of it tooling that you or CI run
+from outside the browser:
+
+- three host scripts: `launch.sh`, `update.sh` and `verify.sh`;
+- the CI scripts `ci/fingerprint.sh` and `ci/test-scripts.sh`;
+- the browser checks `ci/checks.mjs` and their test, `ci/test-checks.mjs`.
+
+Some of it parses untrusted input: `verify.sh` reads JSON from ipinfo.io, and
+`checks.mjs` reads JSON from ipinfo.io and bash.ws.
 
 The configuration, scripts and documentation were written with Claude Code (AI) and reviewed by me.
 
-Having no code is deliberate, and it removes the usual worry about quickly assembled or
-AI-assisted repos: the common failure modes (vulnerable auth code, injection,
-insecure endpoints) cannot exist here, because there is no such code. The whole risk surface
-is the configuration, meaning how secrets are handled, which ports are exposed, and
-whether the kill switch holds. That surface is small, it is all visible in
-`docker-compose.yml`, and an automated security review (Claude Code's
-`/security-review`, run in a separate session over the repo files) reported no
-vulnerabilities within that scope. That is not a third-party audit, so do not take
-it on faith. Read the compose file, and run the checks under
-[Verify it works](#verify-it-works) yourself.
+The risk surface is the configuration (how secrets are handled, which ports are
+exposed, whether the kill switch holds), the images it runs, and these scripts. The
+configuration is all visible in `docker-compose.yml`. The automated reviews listed
+under [About the security review](#about-the-security-review) are not a
+third-party audit, so do not take them on faith. Read the compose file, and run the
+checks under [Verify it works](#verify-it-works) yourself.
 
 ## Continuous checks
 
 Every push, pull request, and a weekly schedule run a CI pipeline you can inspect
 yourself under the Actions tab. It is not a one-time review:
 
-- **ShellCheck** on `launch.sh`, `update.sh`, `verify.sh`, and `ci/fingerprint.sh`.
+- **ShellCheck** on `launch.sh`, `update.sh`, `verify.sh`, `ci/fingerprint.sh` and
+  `ci/test-scripts.sh`.
+- **Failure-path tests.** `ci/test-scripts.sh` runs the four shell scripts against
+  simulated `docker` and `curl`, and `ci/test-checks.mjs` runs `ci/checks.mjs` against a
+  simulated browser and DNS-test API. They prove each script reports FAIL or INCOMPLETE,
+  with the matching exit code, when a step fails or its evidence is missing.
 - **Hadolint** on `Dockerfile.firefox`.
 - **Checkov** on `Dockerfile.firefox`. The findings that are deliberate design choices
   (no HEALTHCHECK, no build-time `USER` — the base image drops
@@ -72,8 +82,9 @@ yourself under the Actions tab. It is not a one-time review:
   `resistFingerprinting` reports, WebGL comes back, the Safe Browsing prefs are not
   off, or CreepJS's font list, WebGL, time zone or CPU-core fields drift from
   `ci/creep-baseline.json`. It compares those fields one by one, never the overall
-  fingerprint ID, which also moves with headless mode and window size. Run it locally
-  with `bash ci/fingerprint.sh`.
+  fingerprint ID, which also moves with headless mode and window size. A missing or
+  empty baseline fails; a new one is recorded only on request (`RECORD=1`). Run it
+  locally with `bash ci/fingerprint.sh`.
 - **Dependabot** opens weekly pull requests for the pinned versions: the Actions
   SHAs, the two jlesage images in `Dockerfile.firefox`, the Gluetun digest, and the CI
   tools listed in `ci/pins/`. Nothing merges automatically, because green CI does not
@@ -89,12 +100,20 @@ they stay a local step you run yourself (see [Verify it works](#verify-it-works)
 
 ## What it does and doesn't do
 
-It gives you privacy. Your ISP, your LAN, and the sites you visit cannot see your
-real IP or link your traffic to your connection.
+It gives you privacy. What each observer sees:
 
-It does not give you anonymity. Your VPN provider can still see your traffic and
-could be compelled to log it. If you need an identity that nobody, including your
-VPN, can trace back to you, use Tor instead.
+- **Websites** see the VPN's exit IP, not your real one.
+- **Your ISP and your LAN**, for traffic this browser sends through its tunnel, see
+  that you use a VPN and when, but not the destinations or the content. Other traffic
+  from your machine, and the timing and volume of the tunnel traffic, are outside
+  that promise.
+- **Your VPN provider** sees your real IP and your destinations.
+- **Logins and behaviour** link your sessions to each other, whatever happens to the
+  profile. A wiped profile does not unlink an account you sign in to.
+
+It does not give you anonymity. Your VPN provider could be compelled to log what it
+sees. If you need an identity that nobody, including your VPN, can trace back to you,
+use Tor instead.
 
 It does not protect you from a compromised host. The container shields your host
 from the browser (exploit containment), but not the browser from the host. A
@@ -206,10 +225,19 @@ the stack up:
 ./verify.sh          # or ./verify.sh SG to also assert the exit country
 ```
 
+Each check ends `PASS`, `FAIL` or `INCOMPLETE`. INCOMPLETE means the evidence could not
+be collected (for example, the host's public IPv4 address could not be looked up). It is
+not a pass: treat it like a failure in anything you automate. Exit codes: 0 = every
+check passed, 1 = at least one FAIL, 3 = no FAIL but at least one INCOMPLETE, 2 = the
+stack is not ready.
+
+The exit-IP check compares the tunnel's exit with the host's *current* public IPv4
+address. If the host itself is behind a VPN, that is not your real IP; give the script
+the address your ISP assigns, `REAL_IP=a.b.c.d ./verify.sh`. It is used only for the
+comparison and never printed. The script prints the VPN exit IP and never the host IP.
+
 It cannot test in-browser WebRTC or the browser-side DNS-leak page — those need a real
-browser and stay manual, above. A recent run is recorded in `VERIFY-OUTPUT.md`; commit
-only a passing run — a failing exit-IP check prints your real host IP verbatim, so a
-failed transcript would publish exactly what this stack exists to hide.
+browser and stay manual, above. A recent run is recorded in `VERIFY-OUTPUT.md`.
 
 ## Optional: self-hosted fingerprint test (CreepJS)
 
@@ -286,7 +314,7 @@ Three is the target. A container with almost no fonts stands out, so the image i
 
 ### Why is Safe Browsing off?
 
-Mozilla's own Firefox build ships Google Safe Browsing keys, so with the defaults it downloads Google's malware and phishing lists and can send details of some downloaded files to Google for a verdict. Those requests would still go through the VPN, but they are a standing connection to Google that this stack otherwise does not make. They are switched off, which also means no built-in phishing or malware blocklist. If you want that protection back, remove the three `FF_PREF_SB_*` lines from `docker-compose.yml`.
+Mozilla's own Firefox build ships Google Safe Browsing keys, so with the defaults it talks to Google in three ways: it downloads Google's malware and phishing lists, it asks Google for the full hashes when a page's address matches a prefix on those lists, and it can send details of some downloaded files to Google for a verdict. Those requests would still go through the VPN, but they are a standing connection to Google that this stack otherwise does not make. They are switched off, and that is an accepted trade-off rather than an oversight: you lose the built-in phishing and malware blocklist. If you want that protection back, remove the three `FF_PREF_SB_*` lines from `docker-compose.yml`.
 
 ### Why is WebGL disabled? Doesn't hiding WebGL make you more unique?
 
@@ -308,7 +336,7 @@ The property that matters is encrypted DNS that never touches your ISP, and that
 
 ### Is it really amnesic?
 
-Yes, fully. The entire browser profile, meaning cookies, history, logins, cache, and downloads, lives in a RAM-backed tmpfs and is gone the moment you stop the stack. There is no persistent downloads folder by design, so anything you fetch is wiped too; save it off the browser first if you need to keep it. The only thing that survives a stop is the VPN container's own state, which holds tunnel data rather than browsing.
+The profile, yes, when you stop the stack with `docker compose down`. The entire browser profile, meaning cookies, history, logins, cache, and downloads, lives in a RAM-backed tmpfs and is discarded with the container. There is no persistent downloads folder by design, so anything you fetch is wiped too; save it off the browser first if you need to keep it. Places outside the profile (container logs, and traces on your own machine such as a clipboard manager) have not yet been checked for browsing data, so this answer covers the profile only.
 
 One honest caveat: tmpfs pages can be pushed to swap under memory pressure, and on a host with unencrypted swap those fragments can touch disk. If that matters to you, encrypt your swap or turn it off. On a host with encrypted swap this is already covered.
 
@@ -318,7 +346,9 @@ A little, and it is worth being precise about. Clipboard sharing is a built-in f
 
 ### About the security review
 
-The configuration was checked with an automated security review, Claude Code's `/security-review`, run in a separate session over the files in this repository. It reported no vulnerabilities within that scope. This is not a third-party human audit or a runtime penetration test. No automated review is a guarantee: a later review of these docs caught claims this one missed, an environment variable that did nothing and a downloads folder that did not actually persist, both since corrected. Treat it as one input, not a seal of approval, and check the design yourself: there is no application code, the risk surface is the configuration, and all of it is here to read alongside the verification steps.
+The configuration was checked with an automated security review, Claude Code's `/security-review`, run in a separate session over the files in this repository. It reported no vulnerabilities within that scope. This is not a third-party human audit or a runtime penetration test. No automated review is a guarantee: a later review of these docs caught claims this one missed, an environment variable that did nothing and a downloads folder that did not actually persist, both since corrected. Treat it as one input, not a seal of approval, and check the design yourself: there is no custom service code, the risk surface is the configuration, the images and the scripts, and all of it is here to read alongside the verification steps.
+
+A later review, on 24 September 2026, was also by an AI reviewer: first the README alone, then the source. The source pass covered the files of the Gluetun v3.41.3 release (compose files, Dockerfile, the three host scripts, `ci/fingerprint.sh`, `ci/checks.mjs` and its baseline, the CI workflow, Dependabot config, README, `VERIFY-OUTPUT.md`, license). It had no Git metadata, so it is tied to that release's content, not a commit. It ran syntax checks, parsed the compose files, and ran the scripts against simulated `docker` and `curl`. It did not run the stack, a VPN or a browser. Its main finding was that the checks reported more confidence than their results justified; the scripts now report PASS, FAIL or INCOMPLETE with matching exit codes, and the wording above has been corrected. Its points about local-network reachability, behaviour while the tunnel changes state, and data outside the profile need runtime tests that have not been run yet. The statements that depend on them (no route to your LAN, the kill switch during reconnects, what survives outside the profile) are unchanged until those tests confirm or correct them.
 
 ## Related projects
 
@@ -345,6 +375,7 @@ interchangeable.
 
 ## Changelog
 
+- 2026-09-24: Acted on a fourth review (see [About the security review](#about-the-security-review)). The scripts no longer report success they have not earned. `verify.sh` reports PASS, FAIL or INCOMPLETE with exit codes 0, 1 and 3; it compares IPv4 with IPv4, takes an optional `REAL_IP` for hosts behind a VPN, never prints the host IP, re-checks connectivity after restoring the tunnel, and restarts `creepjs-server` too. `update.sh` prints `UPDATED` only after the new image is running, Gluetun is healthy, Firefox reports a version and the web UI answers. `launch.sh` stops if `docker compose up` fails and waits for the web UI with one 30-second deadline. In the fingerprint job, a missing or empty CreepJS baseline now fails, the CreepJS download is re-fetched when its pinned commit changes, and `ci/fingerprint.sh` keeps the INCOMPLETE exit code. The DNS check in `ci/checks.mjs` now judges the resolver's identity (its network, AS13335 for Cloudflare) instead of its country, and reports INCOMPLETE when the test service returns no resolver. New failure-path tests (`ci/test-scripts.sh`, `ci/test-checks.mjs`) run in CI. The README now says what each observer sees, lists the scripts and the untrusted input they parse, limits the amnesia claim to the profile, and describes Safe Browsing's three connections to Google.
 - 2026-09-24: Updated Gluetun from v3.40.4 to v3.41.3, pinned by digest. v3.41 renamed the DNS settings, so `DOT` and `DOT_PROVIDERS` are now `DNS_SERVER` and `DNS_UPSTREAM_RESOLVERS` (the old names still work in v3.41). Removed `HEALTH_VPN_DURATION_INITIAL`, which v3.41 no longer reads. Dependabot now proposes Gluetun patch releases; minor versions stay manual. Re-ran the leak battery (exit IP, WebRTC, DNS leak, kill switch): all passing.
 - 2026-09-21: Added Dependabot (`.github/dependabot.yml`): weekly, grouped pull requests for GitHub Actions, the Dockerfile base images, the compose images, and the CI tool versions, which moved into `ci/pins/` so Dependabot can read them. No auto-merge. Corrected the CodeQL action's version comment from `v3` to `v3.37.2` so updates rewrite it.
 - 2026-09-21: Added a CI fingerprint job (`ci/fingerprint.sh`): headless Firefox against a pinned, self-hosted CreepJS, compared field by field with a recorded baseline, plus a check that the Safe Browsing prefs are off. It needs no VPN key, so it runs on every push and on the weekly schedule; the leak tests still run only locally.

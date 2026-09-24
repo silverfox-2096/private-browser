@@ -8,8 +8,10 @@ set -euo pipefail
 # and CreepJS fields (fonts, WebGL, time zone, cores) vs ci/creep-baseline.json.
 # Leak tests (exit IP, DNS, WebRTC, kill switch) need the tunnel: see verify.sh.
 #
-# Usage: bash ci/fingerprint.sh        (SKIP_BUILD=1 reuses private-firefox:ci)
-# Output: ci/out/checks-out.json + creep-full.json. Exit 0 = all PASS.
+# Usage: bash ci/fingerprint.sh        (SKIP_BUILD=1 reuses private-firefox:ci;
+#        RECORD=1 writes ci/out/creep-baseline.json instead of comparing, exit 3)
+# Output: ci/out/checks-out.json + creep-full.json.
+# Exit 0 = all PASS; 1 = any FAIL; 3 = no FAIL but something INCOMPLETE (not a pass).
 
 cd "$(dirname "$(readlink -f "$0")")/.."
 CREEPJS_SHA=10aa6724cd33a1015db1574211890518cd04f0cc   # abrahamjuliot/creepjs master, 2026-06-11
@@ -25,10 +27,15 @@ trap cleanup EXIT
 : "${NODE_IMG:?no node pin in ci/pins/compose.yml}"
 
 echo "1/5 CreepJS $CREEPJS_SHA (its repo ships the built page in docs/)"
-if [ ! -f ci/creepjs-docs/creep.js ]; then
+# The cache is keyed on the pinned SHA (ci/creepjs-docs/.sha), not on a file existing:
+# a new pin re-downloads. .sha is written last, so a failed download is retried.
+if [ "$(cat ci/creepjs-docs/.sha 2>/dev/null)" != "$CREEPJS_SHA" ]; then
+  rm -rf ci/creepjs-docs
   mkdir -p ci/creepjs-docs
   curl -fsSL "https://codeload.github.com/abrahamjuliot/creepjs/tar.gz/$CREEPJS_SHA" |
     tar -xz -C ci/creepjs-docs --strip-components=2 "creepjs-$CREEPJS_SHA/docs"
+  [ -f ci/creepjs-docs/creep.js ] || { echo "FAIL: CreepJS $CREEPJS_SHA has no docs/creep.js"; exit 1; }
+  echo "$CREEPJS_SHA" > ci/creepjs-docs/.sha
 fi
 chmod -R a+rX ci/creepjs-docs   # nginx runs as its own user; a 077 umask hides the page
 
@@ -62,8 +69,11 @@ echo "5/5 headless Firefox + checks (node sidecar in the browser's network names
 docker exec -d -u 1000 -e HOME=/tmp/hlhome "$FF" \
   firefox --headless --no-remote --profile /tmp/hlprof --remote-debugging-port 9222
 mkdir -p "$out"
+crc=0
 docker run --rm --user "$(id -u):$(id -g)" --network "container:$FF" \
-  -e MODE=ci -e EXPECT="$version" -v "$PWD/ci:/w:ro" -v "$out:/out" \
-  "$NODE_IMG" node /w/checks.mjs || fail=1
+  -e MODE=ci -e EXPECT="$version" -e RECORD="${RECORD:-}" -v "$PWD/ci:/w:ro" -v "$out:/out" \
+  "$NODE_IMG" node /w/checks.mjs || crc=$?
 
-exit "$fail"
+# Keep checks.mjs's exit 3 (INCOMPLETE: evidence missing, not a pass). Any FAIL wins.
+if [ "$fail" -ne 0 ] || { [ "$crc" -ne 0 ] && [ "$crc" -ne 3 ]; }; then exit 1; fi
+exit "$crc"

@@ -6,18 +6,28 @@
 //
 // env: EXPECT   Firefox version the image should report ("156.0"); UA check skipped if unset
 //      COUNTRY  expected VPN exit country (ISO-2, default SG)
-//      HOME_CC  the country a leak would show (default IN)
+//      DNS_ASN  the ASN every DNS resolver must belong to (default AS13335, Cloudflare:
+//               matches DNS_UPSTREAM_RESOLVERS=cloudflare in docker-compose.yml)
+//      HOME_CC  optional, informational only: counts resolvers in that country. Never
+//               decides PASS/FAIL.
 //      MODE     "ci" = fingerprint checks only (no VPN: skips exitIp, webrtc, dnsLeak);
 //               used by the public repo's CI job (ci/fingerprint.sh). Same file there.
-// Reads /w/creep-baseline.json if present (no file = record-only run, used once to
-// create it). Writes /out/checks-out.json (summary) + /out/creep-full.json.
-// Exit 0 = every check PASS; exit 1 = any FAIL.
+//      RECORD   "1" = write the CreepJS fields to /out/creep-baseline.json instead of
+//               comparing (the creepjs check is then INCOMPLETE, never PASS).
+// Reads /w/creep-baseline.json: missing or empty = FAIL unless RECORD=1.
+// Writes /out/checks-out.json (summary) + /out/creep-full.json.
+// Exit 0 = every check PASS; 1 = any FAIL; 3 = none FAIL but some INCOMPLETE
+// (evidence missing: not a pass).
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 
 const EXPECT = process.env.EXPECT || '';
 const COUNTRY = (process.env.COUNTRY || 'SG').toUpperCase();
-const HOME_CC = (process.env.HOME_CC || 'IN').toLowerCase();
+const DNS_ASN = (process.env.DNS_ASN || 'AS13335').toUpperCase();
+const HOME_CC = (process.env.HOME_CC || '').toLowerCase();
 const CI = process.env.MODE === 'ci';
+const RECORD = process.env.RECORD === '1';
+const W = process.env.CHECKS_IN || '/w';     // overridden only by ci/test-checks.mjs
+const OUT = process.env.CHECKS_OUT || '/out';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function open(url) {
@@ -66,13 +76,15 @@ async function js(expression) {
 }
 const go = (url) => send('browsingContext.navigate', { context, url, wait: 'complete' });
 
-// fn returns [ok, detail]. A thrown error is a FAIL: a check that could not run
-// has not proven anything.
+// fn returns [ok, detail]; ok is true, false or 'INCOMPLETE' (the evidence needed to
+// decide is missing). A thrown error is a FAIL: a check that could not run has not
+// proven anything.
 async function check(name, fn) {
   let ok = false, detail;
   try { [ok, detail] = await fn(); } catch (e) { detail = `ERROR: ${e.message}`; }
-  out.checks[name] = { result: ok ? 'PASS' : 'FAIL', detail };
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}: ${typeof detail === 'string' ? detail : JSON.stringify(detail)}`);
+  const result = ok === 'INCOMPLETE' ? 'INCOMPLETE' : ok === true ? 'PASS' : 'FAIL';
+  out.checks[name] = { result, detail };
+  console.log(`${result}  ${name}: ${typeof detail === 'string' ? detail : JSON.stringify(detail)}`);
 }
 
 await go(CI ? 'http://localhost:8080/' : 'https://ipinfo.io/');
@@ -119,21 +131,47 @@ if (!CI) {
     return [exitIp !== '' && bad.length === 0, seen];
   });
 
-  // DNS leak via bash.ws's JSON API: the BROWSER resolves 10 unique
-  // names under <id>.bash.ws; bash.ws lists the resolvers that asked. Pass = at least
-  // one resolver seen and none in the home country.
+  // DNS resolver identity via bash.ws's JSON API: the BROWSER resolves 10 unique names
+  // under <id>.bash.ws; bash.ws lists the resolvers that asked. This checks WHO
+  // resolved, not the network path (a packet capture is the path proof).
+  // FAIL = any resolver outside DNS_ASN. INCOMPLETE = the API failed, no resolver was
+  // listed, or a resolver has no ASN. PASS = every resolver is in DNS_ASN.
   await check('dnsLeak', async () => {
-    const id = (await (await fetch('https://bash.ws/id')).text()).trim();
-    if (!/^[a-z0-9]+$/.test(id)) throw new Error(`bad id ${JSON.stringify(id)}`);
-    await js(`Promise.allSettled([...Array(10).keys()].map((i) =>
-      Promise.race([fetch('https://' + (i + 1) + '.${id}.bash.ws/', { mode: 'no-cors' }),
-                    new Promise((r) => setTimeout(r, 5000))]))).then(() => 'ok')`);
-    await sleep(2000);
-    const list = await (await fetch(`https://bash.ws/dnsleak/test/${id}?json`)).json();
-    const dns = list.filter((e) => e.type === 'dns');
-    const home = list.filter((e) => (e.type === 'dns' || e.type === 'ip') && e.country === HOME_CC);
-    return [dns.length > 0 && home.length === 0,
-      list.filter((e) => e.type !== 'conclusion').map((e) => `${e.type} ${e.ip} ${e.country} ${e.asn}`)];
+    const api = async (url, how) => {
+      try {
+        const r = await fetch(url);
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return await r[how]();
+      } catch (e) { throw Object.assign(new Error(`bash.ws API: ${e.message}`), { incomplete: true }); }
+    };
+    try {
+      const id = String(await api('https://bash.ws/id', 'text')).trim();
+      if (!/^[a-z0-9]+$/.test(id)) return ['INCOMPLETE', `bash.ws API: bad id ${JSON.stringify(id)}`];
+      await js(`Promise.allSettled([...Array(10).keys()].map((i) =>
+        Promise.race([fetch('https://' + (i + 1) + '.${id}.bash.ws/', { mode: 'no-cors' }),
+                      new Promise((r) => setTimeout(r, 5000))]))).then(() => 'ok')`);
+      await sleep(2000);
+      const list = await api(`https://bash.ws/dnsleak/test/${id}?json`, 'json');
+      if (!Array.isArray(list)) return ['INCOMPLETE', 'bash.ws API: the reply is not a list'];
+      const dns = list.filter((e) => e?.type === 'dns');
+      const asnOf = (e) => (typeof e.asn === 'string' ? e.asn.trim().split(/\s+/)[0].toUpperCase() : '');
+      const known = (e) => /^AS\d+$/.test(asnOf(e));
+      const foreign = dns.filter((e) => known(e) && asnOf(e) !== DNS_ASN);
+      const unknown = dns.filter((e) => !known(e));
+      const seen = list.filter((e) => e?.type !== 'conclusion')
+        .map((e) => `${e?.type} ${e?.ip} ${e?.country} ${e?.asn}`);
+      if (HOME_CC) {
+        const n = dns.filter((e) => String(e.country).toLowerCase() === HOME_CC).length;
+        seen.push(`info: ${n} resolver(s) in HOME_CC=${HOME_CC} (informational, not gated)`);
+      }
+      if (foreign.length) return [false, [`${foreign.length} resolver(s) outside ${DNS_ASN}`, ...seen]];
+      if (!dns.length) return ['INCOMPLETE', ['no resolver identity returned', ...seen]];
+      if (unknown.length) return ['INCOMPLETE', [`${unknown.length} resolver(s) with no ASN`, ...seen]];
+      return [true, [`all ${dns.length} resolvers in ${DNS_ASN} (resolver identity, not path proof)`, ...seen]];
+    } catch (e) {
+      if (e.incomplete) return ['INCOMPLETE', e.message];
+      throw e;
+    }
   });
 }  // !CI
 
@@ -149,7 +187,7 @@ await check('creepjs', async () => {
     if (!fp) await sleep(1000);
   }
   if (!fp) throw new Error('window.Fingerprint not set after 60 s');
-  writeFileSync('/out/creep-full.json', JSON.stringify(fp, null, 2));
+  writeFileSync(`${OUT}/creep-full.json`, JSON.stringify(fp, null, 2));
   const summary = {
     fonts: fp.fonts?.fontFaceLoadFonts ?? null,
     mediaMimes: fp.media?.mimeTypes?.length ?? null,
@@ -160,16 +198,28 @@ await check('creepjs', async () => {
     screen: fp.screen ? `${fp.screen.width}x${fp.screen.height}` : null,  // headless window, not the GUI 1800x900
   };
   out.creep = summary;
-  const bfile = '/w/creep-baseline.json';
-  if (!existsSync(bfile)) return [true, 'record-only (no creep-baseline.json)'];
+  if (RECORD) {
+    const { fonts, webglBlocked, timezone, cores } = summary;  // the gated fields
+    writeFileSync(`${OUT}/creep-baseline.json`, JSON.stringify({ fonts, webglBlocked, timezone, cores }, null, 2) + '\n');
+    return ['INCOMPLETE', `RECORD=1: wrote ${OUT}/creep-baseline.json, compared nothing`];
+  }
+  // No baseline = nothing to compare = FAIL (a missing file once passed as "record-only").
+  const bfile = `${W}/creep-baseline.json`;
+  if (!existsSync(bfile)) return [false, 'no creep-baseline.json (record one with RECORD=1)'];
   const base = JSON.parse(readFileSync(bfile, 'utf8'));
+  if (!base || typeof base !== 'object' || Array.isArray(base) || !Object.keys(base).length) {
+    return [false, 'creep-baseline.json is empty: nothing to compare'];
+  }
   const diff = Object.keys(base).filter((k) => JSON.stringify(base[k]) !== JSON.stringify(summary[k]))
     .map((k) => `${k}: baseline ${JSON.stringify(base[k])} now ${JSON.stringify(summary[k])}`);
   return [diff.length === 0, diff.length ? diff : `${Object.keys(base).length} fields = baseline`];
 });
 
 try { await send('browser.close'); } catch { /* the wrapper kills it anyway */ }
-writeFileSync('/out/checks-out.json', JSON.stringify(out, null, 2));
-const failed = Object.entries(out.checks).filter(([, v]) => v.result !== 'PASS').map(([k]) => k);
-console.log(failed.length ? `FAIL: ${failed.join(' ')}` : 'ALL PASS');
-process.exit(failed.length ? 1 : 0);
+writeFileSync(`${OUT}/checks-out.json`, JSON.stringify(out, null, 2));
+const named = (r) => Object.entries(out.checks).filter(([, v]) => v.result === r).map(([k]) => k);
+const failed = named('FAIL'), incomplete = named('INCOMPLETE');
+if (failed.length) { console.log(`FAIL: ${failed.join(' ')}`); process.exit(1); }
+if (incomplete.length) { console.log(`INCOMPLETE: ${incomplete.join(' ')} (not a pass)`); process.exit(3); }
+console.log('ALL PASS');
+process.exit(0);

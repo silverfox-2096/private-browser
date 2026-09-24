@@ -1,6 +1,8 @@
 # CI: static analysis + image CVE scan for the private-browser stack.
-# One workflow, one badge. It does NOT run verify.sh -- that needs a live VPN key
-# and a running stack (see verify.sh / README). The fingerprint job runs the browser
+# One workflow, one badge. It does NOT run verify.sh for real -- that needs a live VPN
+# key and a running stack (see verify.sh / README). ci/test-scripts.sh runs verify.sh,
+# update.sh, launch.sh and ci/fingerprint.sh against stubbed docker/curl to prove their
+# FAILURE paths; ci/test-checks.mjs does the same for checks.mjs. The fingerprint job runs the browser
 # without the VPN, so it checks what a page sees, never what leaks.
 #
 # SUPPLY-CHAIN NOTE: the `uses:` actions below are pinned to full commit SHAs
@@ -33,7 +35,11 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
       - name: ShellCheck (preinstalled on the runner)
-        run: shellcheck launch.sh update.sh verify.sh ci/fingerprint.sh
+        run: shellcheck launch.sh update.sh verify.sh ci/fingerprint.sh ci/test-scripts.sh
+      - name: Failure-path tests (docker/curl stubbed; no stack, no network)
+        run: bash ci/test-scripts.sh
+      - name: checks.mjs verdicts (browser + bash.ws stubbed; runner Node)
+        run: node ci/test-checks.mjs
 
   hadolint:
     runs-on: ubuntu-latest
