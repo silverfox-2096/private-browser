@@ -51,7 +51,9 @@ docker() {
       case "$*" in
         *build*) return "${S_BUILD_RC:-0}" ;;
         *pull*) return "${S_PULL_RC:-0}" ;;
-        *--wait*) rm -f "$SD/stopped"; touch "$SD/restored"; return "${S_COMPOSE_RC:-0}" ;;  # verify restore
+        *--wait*)   # verify restore; S_INT_RESTORE = Ctrl+C while it runs
+          [ "${S_INT_RESTORE:-0}" = 1 ] && kill -INT $$
+          rm -f "$SD/stopped"; touch "$SD/restored"; return "${S_COMPOSE_RC:-0}" ;;
         *up*) return "${S_UP_RC:-0}" ;;
       esac ;;
     run) return "${S_NODE_RC:-0}" ;;                    # ci/fingerprint.sh: node checks.mjs
@@ -74,7 +76,7 @@ curl() {
 }
 # tar -xz -C DIR ...: "extracts" creep.js unless S_CJ_EMPTY=1.
 tar() { cat >/dev/null; [ "${S_CJ_EMPTY:-0}" = 1 ] || touch "$3/creep.js"; }
-timeout() { shift; "$@"; }
+timeout() { echo "timeout $*" >>"$SD/calls"; shift; "$@"; }   # logged: bounded calls are checked
 sleep() { SECONDS=$((SECONDS + ${1%%.*})); }   # simulated clock: deadlines expire, instantly
 xdg-open() { echo "xdg-open $*" >>"$SD/calls"; }
 export -f docker curl tar timeout sleep xdg-open
@@ -127,6 +129,16 @@ t "REAL_IP malformed"               3 'REAL_IP is malformed'       '999\.1' REAL
 t "REAL_IP = exit IP"               1 'comparison FAILED'          ''       REAL_IP=$EXIT_IP
 t "REAL_IP valid, differs"          0 'against REAL_IP'            "$REAL"  REAL_IP=$REAL
 t "post-restore probe fails"        1 'post-restore connectivity check failed' '' S_PROBE_RESTORED=4
+# The exit address is printed only on request, and only once it is shown to differ.
+HOSTJSON=$(printf '{"ip": "%s", "country": "SG"}' "$HOST")
+t "exit IP hidden by default"       0 '^PASS  exit IP'             "$EXIT_IP" $N
+t "SHOW_EXIT_IP=1 prints it on PASS" 0 "^PASS  exit IP.*$EXIT_IP"  ''       SHOW_EXIT_IP=1
+t "host lookup fails, exit = host"  3 '^INCOMPLETE  exit IP'       "$HOST"  S_HOST_IP= S_HOST_RC=6 "S_EXIT_JSON=$HOSTJSON"
+t "REAL_IP malformed, exit = host"  3 'REAL_IP is malformed'       "$HOST"  REAL_IP=999.1.1.1 "S_EXIT_JSON=$HOSTJSON"
+t "SHOW_EXIT_IP=1, not compared"    3 '^INCOMPLETE  exit IP'       "$HOST"  SHOW_EXIT_IP=1 S_HOST_IP= S_HOST_RC=6 "S_EXIT_JSON=$HOSTJSON"
+# Only canonical dotted-quad IPv4 is compared: leading zeros would compare as unequal strings.
+t "REAL_IP with leading zeros"      3 'REAL_IP is malformed'       '^PASS  exit IP' REAL_IP=203.000.113.009
+t "host lookup with leading zeros"  3 'IPv4 unavailable'           '^PASS  exit IP' S_HOST_IP=203.000.113.009
 
 # Cases that inspect the stub call log, not just the output.
 rm -f "$SD"/calls "$SD"/restarts "$SD"/stopped
@@ -148,6 +160,25 @@ env S_INT=1 bash "$W/verify.sh" SG >/dev/null 2>&1; rc=$?
 if [ "$rc" = 130 ] && [ ! -f "$SD/stopped" ] && command grep -qx private-firefox "$SD/restarts" 2>/dev/null; then
   pass=$((pass+1)); echo "ok    Ctrl+C mid kill switch restores the stack (rc 130)"
 else failn=$((failn+1)); echo "FAIL  Ctrl+C mid kill switch: rc=$rc, stopped=$([ -f "$SD/stopped" ] && echo yes || echo no)"; fi
+
+# Ctrl+C while the stack is being restored: recovery must finish before the exit, both on
+# the normal path and inside the EXIT trap (a second Ctrl+C after one mid kill switch).
+for v in S_INT_RESTORE=1 "S_INT=1 S_INT_RESTORE=1"; do
+  rm -f "$SD"/stopped "$SD"/restored "$SD"/restarts
+  # shellcheck disable=SC2086  # $v is one or two VAR=value words, split on purpose
+  env $v bash "$W/verify.sh" SG >/dev/null 2>&1; rc=$?
+  if [ "$rc" = 130 ] && [ ! -f "$SD/stopped" ] && command grep -qx private-firefox "$SD/restarts" 2>/dev/null; then
+    pass=$((pass+1)); echo "ok    Ctrl+C during restore ($v): restore finished, rc 130"
+  else failn=$((failn+1)); echo "FAIL  Ctrl+C during restore ($v): rc=$rc, stopped=$([ -f "$SD/stopped" ] && echo yes || echo no)"; fi
+done
+
+# Once the tunnel is down, every docker call must be bounded: the stub logs "timeout ..."
+# on the line before each call it wraps.
+rm -f "$SD"/calls "$SD"/stopped "$SD"/restarts
+env S_CREEP=true bash "$W/verify.sh" SG >/dev/null 2>&1
+unb=$(awk '/^docker (stop|restart|compose|exec private-firefox wget)/ && prev !~ /^timeout / {print} {prev=$0}' "$SD/calls")
+if [ -z "$unb" ] && command grep -q '^docker restart' "$SD/calls"; then pass=$((pass+1)); echo "ok    stop/restore/probe docker calls are bounded by timeout"
+else failn=$((failn+1)); echo "FAIL  unbounded docker calls:"; printf '%s\n' "$unb" | sed 's/^/        | /'; fi
 
 echo
 echo "== update.sh"

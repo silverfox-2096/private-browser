@@ -233,8 +233,14 @@ stack is not ready.
 
 The exit-IP check compares the tunnel's exit with the host's *current* public IPv4
 address. If the host itself is behind a VPN, that is not your real IP; give the script
-the address your ISP assigns, `REAL_IP=a.b.c.d ./verify.sh`. It is used only for the
-comparison and never printed. The script prints the VPN exit IP and never the host IP.
+the address your ISP assigns, `REAL_IP=a.b.c.d ./verify.sh` (no leading zeros; anything
+else is INCOMPLETE). It is used only for the comparison and never printed. By default the
+script prints no IP address at all: until the comparison succeeds, the exit address could
+be the host's own. `SHOW_EXIT_IP=1` prints the exit address, and only on a PASS.
+
+If you interrupt the script (Ctrl+C) while it has the tunnel stopped, it restores the
+stack first and then exits with code 130. Each Docker step it takes while the tunnel is
+down has a time limit.
 
 It cannot test in-browser WebRTC or the browser-side DNS-leak page — those need a real
 browser and stay manual, above. A recent run is recorded in `VERIFY-OUTPUT.md`.
@@ -375,6 +381,7 @@ interchangeable.
 
 ## Changelog
 
+- 2026-09-24: Three fixes to `verify.sh` from the reviewer's check of the previous release. The earlier entry's "never prints the host IP" was not true: when the comparison could not be made, the script printed the exit address, which is the host's own IP if the tunnel is not working. It now prints no address unless `SHOW_EXIT_IP=1` is set, and then only on a PASS. IPv4 addresses with leading zeros (`203.000.113.009`) are rejected instead of being compared as text, which could report a false PASS. A Ctrl+C while the script restores the tunnel no longer abandons the restore, and every Docker step while the tunnel is down has a time limit. The failure-path tests cover all three.
 - 2026-09-24: Acted on a fourth review (see [About the security review](#about-the-security-review)). The scripts no longer report success they have not earned. `verify.sh` reports PASS, FAIL or INCOMPLETE with exit codes 0, 1 and 3; it compares IPv4 with IPv4, takes an optional `REAL_IP` for hosts behind a VPN, never prints the host IP, re-checks connectivity after restoring the tunnel, and restarts `creepjs-server` too. `update.sh` prints `UPDATED` only after the new image is running, Gluetun is healthy, Firefox reports a version and the web UI answers. `launch.sh` stops if `docker compose up` fails and waits for the web UI with one 30-second deadline. In the fingerprint job, a missing or empty CreepJS baseline now fails, the CreepJS download is re-fetched when its pinned commit changes, and `ci/fingerprint.sh` keeps the INCOMPLETE exit code. The DNS check in `ci/checks.mjs` now judges the resolver's identity (its network, AS13335 for Cloudflare) instead of its country, and reports INCOMPLETE when the test service returns no resolver. New failure-path tests (`ci/test-scripts.sh`, `ci/test-checks.mjs`) run in CI. The README now says what each observer sees, lists the scripts and the untrusted input they parse, limits the amnesia claim to the profile, and describes Safe Browsing's three connections to Google.
 - 2026-09-24: Updated Gluetun from v3.40.4 to v3.41.3, pinned by digest. v3.41 renamed the DNS settings, so `DOT` and `DOT_PROVIDERS` are now `DNS_SERVER` and `DNS_UPSTREAM_RESOLVERS` (the old names still work in v3.41). Removed `HEALTH_VPN_DURATION_INITIAL`, which v3.41 no longer reads. Dependabot now proposes Gluetun patch releases; minor versions stay manual. Re-ran the leak battery (exit IP, WebRTC, DNS leak, kill switch): all passing.
 - 2026-09-21: Added Dependabot (`.github/dependabot.yml`): weekly, grouped pull requests for GitHub Actions, the Dockerfile base images, the compose images, and the CI tool versions, which moved into `ci/pins/` so Dependabot can read them. No auto-merge. Corrected the CodeQL action's version comment from `v3` to `v3.37.2` so updates rewrite it.

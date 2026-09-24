@@ -12,13 +12,18 @@
 #
 # Usage (on the host, stack already up):   [REAL_IP=a.b.c.d] ./verify.sh [EXPECTED_COUNTRY_ISO]
 #   e.g.  ./verify.sh SG    to also assert the exit country is Singapore.
-#   REAL_IP: the IPv4 address your ISP gives you. Set it when the host itself is behind a
-#   VPN, where the host's current public IP is not your real one. It is never printed.
+#   REAL_IP: the IPv4 address your ISP gives you, written a.b.c.d with no leading zeros.
+#   Set it when the host itself is behind a VPN, where the host's current public IP is not
+#   your real one. It is never printed.
+#   SHOW_EXIT_IP=1: also print the tunnel's exit address, and only once the check has
+#   shown it differs from the host/REAL_IP address. By default no address is printed:
+#   until that comparison succeeds, the exit address may BE the host's.
 # Each check ends PASS, FAIL, or INCOMPLETE. INCOMPLETE means the evidence could not be
 # collected, and it is never counted as a pass. Exit codes: 0 = every check passed,
-# 1 = at least one FAIL, 3 = no FAIL but at least one INCOMPLETE, 2 = stack not ready.
-# It prints only the VPN exit IP (safe to publish) -- never the host IP or any secret --
-# and stamps its own header in UTC (date -u), so committed output leaks no local timezone.
+# 1 = at least one FAIL, 3 = no FAIL but at least one INCOMPLETE, 2 = stack not ready,
+# 130 = interrupted (after the tunnel has been restored).
+# It prints no IP address unless asked (SHOW_EXIT_IP) and no secret, and stamps its own
+# header in UTC (date -u), so committed output leaks no local timezone.
 #
 # NOTE: the kill-switch test stops the tunnel and restarts Firefox, closing anything you
 # have open in the browser. Run this BETWEEN browsing sessions, not during one.
@@ -34,19 +39,24 @@ EXPECT_COUNTRY="${1:-}"   # optional ISO code (e.g. SG); if unset, country is in
 
 fail=0
 incomplete=0
-stopped=0   # 1 from just BEFORE Gluetun is stopped until it is restored
+stopped=0   # 1 from just BEFORE Gluetun is stopped until the stack is back up
+interrupted=0
 pass() { printf 'PASS  %s\n' "$1"; }
 bad()  { printf 'FAIL  %s\n' "$1"; fail=1; }
 inc()  { printf 'INCOMPLETE  %s\n' "$1"; incomplete=1; }
 info() { printf '      %s\n' "$1"; }
-running() { [ "$(docker inspect -f '{{.State.Running}}' "$1" 2>/dev/null)" = true ]; }
+# Every docker call that can run while the tunnel is down is bounded, so a hung daemon
+# cannot leave the stack stopped with the script waiting forever.
+running() { [ "$(timeout 20 docker inspect -f '{{.State.Running}}' "$1" 2>/dev/null)" = true ]; }
 retry() { "$@" || { sleep 2; "$@"; }; }   # one retry for flaky lookups
+# Canonical dotted-quad IPv4 only. Leading zeros are rejected: "203.000.113.009" and
+# "203.0.113.9" are one address but different strings, and the check compares strings.
 is_ipv4() {
   local IFS=. o
-  [[ "$1" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]] || return 1
-  for o in $1; do [ "$((10#$o))" -le 255 ] || return 1; done
+  [[ "$1" =~ ^(0|[1-9][0-9]{0,2})(\.(0|[1-9][0-9]{0,2})){3}$ ]] || return 1
+  for o in $1; do [ "$o" -le 255 ] || return 1; done
 }
-probe() { docker exec "$FIREFOX" wget -T 5 -qO- "$PROBE" >/dev/null 2>&1; }
+probe() { timeout 15 docker exec "$FIREFOX" wget -T 5 -qO- "$PROBE" >/dev/null 2>&1; }
 
 printf 'private-browser verify.sh -- %s\n\n' "$(date -u '+%Y-%m-%d %H:%M UTC')"
 
@@ -61,20 +71,24 @@ fi
 # reattach Firefox (and CreepJS, which is left in the dead namespace otherwise). If we
 # never stopped it, do nothing. Every step is checked, and Firefox must reach the probe
 # again: a stack left down or offline after a "passing" run is itself a failure.
+# Ctrl+C / TERM while restoring is noted, not obeyed: the restore finishes first (each
+# step is bounded), and the caller exits 130 afterwards. `stopped` is cleared only once
+# the stack is back, never at the start.
 restore() {
   [ "$stopped" -eq 1 ] || return 0
-  stopped=0
+  trap 'interrupted=1' INT TERM
   info "restoring stack..."
   local ok=1 i
   timeout 180 docker compose up -d --wait >/dev/null 2>&1 || ok=0
-  docker restart "$FIREFOX" >/dev/null 2>&1 || ok=0
-  if running "$CREEPJS"; then docker restart "$CREEPJS" >/dev/null 2>&1 || ok=0; fi
+  timeout 60 docker restart "$FIREFOX" >/dev/null 2>&1 || ok=0
+  if running "$CREEPJS"; then timeout 60 docker restart "$CREEPJS" >/dev/null 2>&1 || ok=0; fi
   running "$FIREFOX" || ok=0
   if [ "$ok" -ne 1 ]; then
     bad "restore: the stack did not come back cleanly. Run by hand:"
     info "docker compose up -d --wait && docker restart $FIREFOX"
     return 0
   fi
+  stopped=0
   for i in 1 2 3 4 5 6; do   # Firefox's container needs a few seconds after restart
     probe && { info "stack restored; Firefox reaches $PROBE again"; return 0; }
     [ "$i" -lt 6 ] && sleep 5
@@ -99,7 +113,7 @@ if [ -n "${REAL_IP:-}" ]; then
     cmp_ip=$REAL_IP
     info "comparing the exit IP against REAL_IP (not printed)"
   else
-    info "REAL_IP is set but is not a valid IPv4 address; it was not used"
+    info "REAL_IP is set but is not a canonical IPv4 address (a.b.c.d, no leading zeros); not used"
   fi
 else
   cmp_ip=$(retry curl -4 -s --max-time 10 https://ipinfo.io/ip 2>/dev/null || true)
@@ -112,15 +126,18 @@ if [ -z "$exit_ip" ]; then
   bad "exit IP: could not read ipinfo.io through the tunnel"
 elif ! is_ipv4 "$exit_ip"; then
   inc "exit IP: the tunnel exit is not an IPv4 address, so it was not compared"
+# No address is printed in the branches below: without a successful comparison the exit
+# address may be the host's own.
 elif [ -n "${REAL_IP:-}" ] && [ -z "$cmp_ip" ]; then
-  inc "exit IP: REAL_IP is malformed, so the tunnel exit ($exit_ip) was not compared"
+  inc "exit IP: REAL_IP is malformed, so the tunnel exit was not compared"
 elif [ -z "$cmp_ip" ]; then
-  inc "exit IP: host public IPv4 unavailable, so the tunnel exit ($exit_ip) was not compared"
+  inc "exit IP: host public IPv4 unavailable, so the tunnel exit was not compared"
 elif [ "$exit_ip" = "$cmp_ip" ]; then
-  # Do not print the address: here it IS the real IP.
   bad "exit IP equals the host/REAL_IP address: comparison FAILED, traffic may not be tunnelled"
 else
-  pass "exit IP differs from the host/REAL_IP address ($exit_ip, country=${exit_country:-?})"
+  shown=''
+  [ "${SHOW_EXIT_IP:-0}" = 1 ] && shown="$exit_ip, "
+  pass "exit IP differs from the host/REAL_IP address (${shown}country=${exit_country:-?})"
 fi
 
 if [ -n "$EXPECT_COUNTRY" ]; then
@@ -157,7 +174,7 @@ elif ! probe; then
   info "'blocked' result would prove nothing (not tested)"
 else
   stopped=1
-  docker stop "$GLUETUN" >/dev/null
+  timeout 60 docker stop "$GLUETUN" >/dev/null
   rc=0; probe || rc=$?
   if [ "$rc" -eq 0 ]; then
     bad "kill switch: Firefox still reached $PROBE with the tunnel stopped"
@@ -171,13 +188,18 @@ else
   fi
 fi
 
-# Restore if we stopped the tunnel, then report. Disarm the trap first so it can't fire
-# restore a second time on exit.
+# Restore if we stopped the tunnel, then report. From here a Ctrl+C is only noted, so it
+# cannot land between disarming the EXIT trap and the restore; the trap is disarmed so
+# restore cannot run a second time on exit.
+trap 'interrupted=1' INT TERM
 trap - EXIT
 restore
 
 echo
-if [ "$fail" -ne 0 ]; then
+if [ "$interrupted" -ne 0 ]; then
+  echo "INTERRUPTED -- not a pass. The restore above ran to the end before exiting."
+  exit 130
+elif [ "$fail" -ne 0 ]; then
   echo "ONE OR MORE CHECKS FAILED -- see FAIL lines above."
   exit 1
 elif [ "$incomplete" -ne 0 ]; then
