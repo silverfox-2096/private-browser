@@ -4,18 +4,23 @@
 ![License](https://img.shields.io/github/license/silverfox-2096/private-browser)
 ![Last commit](https://img.shields.io/github/last-commit/silverfox-2096/private-browser)
 
-Firefox in a Docker container whose only network path is a WireGuard VPN tunnel.
-If the tunnel drops, the browser has no route anywhere, not even to your LAN. The
-profile lives in RAM and is wiped every time you stop the stack.
+Firefox in a Docker container whose only way to the internet is a WireGuard VPN
+tunnel. If the tunnel drops, Gluetun's firewall blocks the internet and your LAN; the
+browser can still reach other containers on its Docker network and, depending on
+your host's firewall, services on the host itself (see
+[What has been tested](#what-has-been-tested)).
+The profile lives in RAM and is wiped when you stop the stack with
+`docker compose down`.
 
 Built from two existing images: [Gluetun](https://github.com/qdm12/gluetun) for
 the VPN and kill switch and jlesage's [GUI base image](https://github.com/jlesage/docker-baseimage-gui)
 for a VNC web UI, with Firefox installed from Mozilla's own APT repository and
 hardened with Firefox's own `resistFingerprinting`.
 
-> Docs & config verified: 2026-09-24 (Firefox 156, Gluetun v3.41.3).
-> Runtime & leak-tested: 2026-09-24. This is a security tool; if either date
-> looks old, treat it as unverified.
+> Docs & config verified: 2026-09-26 (Firefox 156, Gluetun v3.41.3).
+> Runtime & leak-tested: 2026-09-26, on one host; what was and was not tested is
+> under [What has been tested](#what-has-been-tested). This is a security tool; if
+> either date looks old, treat it as unverified.
 
 ## What this is, and what it isn't
 
@@ -23,7 +28,7 @@ Three things to know before you start:
 
 - Privacy, not anonymity. Sites you visit see the VPN's exit IP, not yours. Your ISP and your LAN see that you use a VPN and when, but not where this browser goes or what it sends. Your VPN provider sees both your real IP and your destinations. If you need to be untraceable, use Tor instead. Details per observer: [What it does and doesn't do](#what-it-does-and-doesnt-do).
 - Not a one-click app. It needs Docker and a paid WireGuard VPN (this example uses Proton).
-- Closing it erases everything. Bookmarks, logins, history, cookies, and downloads all live in RAM and are wiped every time you stop the stack, by design. There is no persistent folder, so save anything you want to keep somewhere off the browser (a cloud drive, email) before you stop it.
+- Closing it erases the browser's data. Bookmarks, logins, history, cookies, and downloads all live in RAM and are wiped when you stop the stack with `docker compose down`, by design. There is no persistent folder, so save anything you want to keep somewhere off the browser (a cloud drive, email) before you stop it. Your own machine can still keep traces, such as text from the web UI's clipboard panel; see [Is it really amnesic?](#is-it-really-amnesic).
 
 ## No custom service code
 
@@ -50,6 +55,47 @@ configuration is all visible in `docker-compose.yml`. The automated reviews list
 under [About the security review](#about-the-security-review) are not a
 third-party audit, so do not take them on faith. Read the compose file, and run the
 checks under [Verify it works](#verify-it-works) yourself.
+
+### What you are trusting
+
+What runs, and with which privileges, as checked on the running stack in September
+2026:
+
+- **Firefox**, Mozilla's own build from its APT repository. It runs as an
+  unprivileged user (UID 1000) with no Linux capabilities, `no-new-privileges`, and
+  Docker's default seccomp and AppArmor profiles. Its own sandbox is partly in
+  force: `about:support` reports seccomp-BPF filtering on and content sandbox level 6
+  in effect, and user namespaces unavailable inside the container.
+- **jlesage's GUI base image**: its init process, the web server and login page (TLS
+  on port 5800), the X server with VNC on a local socket only (the raw VNC port is
+  disabled), and the noVNC page your own browser loads. The init is the only process
+  in the Firefox container that runs as root (with Docker's default capabilities);
+  the rest run as UID 1000.
+- **Gluetun**: the WireGuard key and tunnel, the firewall that acts as the kill
+  switch, a DNS server and a control server. It runs as root in its own container,
+  with the `NET_ADMIN` capability and `/dev/net/tun`. The control server (port 8000)
+  requires an API key.
+- **nginx** (`nginx:alpine`), only if you start the optional CreepJS test profile.
+- **Docker and the host kernel**, which create the shared namespace and enforce the
+  container boundary. Anyone who can run Docker commands on the host controls the
+  stack, including reading the WireGuard key and the API key with `docker inspect`.
+- **The browser you view the web UI in.** It holds the login session and the
+  clipboard panel; see [Is it really amnesic?](#is-it-really-amnesic).
+
+Who can open a TCP connection to what inside the shared namespace (tested 2026-09-24,
+after the two fixes in that day's changelog):
+
+| Port in the namespace | Your host, `127.0.0.1:7814` | The host via the Docker network, and other containers on it | The browser's own namespace | A machine on your LAN |
+|---|---|---|---|---|
+| 5800, web UI | login page | login page | login page | no (timed out) |
+| 8000, Gluetun control | not published | 401 without the key | 401 without the key | no (timed out) |
+| 53, Gluetun DNS | not published | open | open | no (timed out) |
+| 9999, Gluetun health (loopback only) | not published | refused | open | no (timed out) |
+| 5900, raw VNC | not published | refused: nothing listens | refused: nothing listens | no |
+
+A web page open in the browser that requested `127.0.0.1:8000` first triggered
+Firefox's local-network permission prompt; after Block, nothing reached Gluetun
+(tested before the API key was added).
 
 ## Continuous checks
 
@@ -115,20 +161,90 @@ It does not give you anonymity. Your VPN provider could be compelled to log what
 sees. If you need an identity that nobody, including your VPN, can trace back to you,
 use Tor instead.
 
-It does not protect you from a compromised host. The container shields your host
-from the browser (exploit containment), but not the browser from the host. A
-keylogger on your machine sees everything before it reaches Firefox.
+It does not protect you from a compromised host. The container puts a boundary
+between the browser and your host (an unprivileged user with no capabilities, plus
+Docker's seccomp and AppArmor profiles; see [What you are trusting](#what-you-are-trusting)),
+but nothing protects the browser from the host. A keylogger on your machine sees
+everything before it reaches Firefox.
 
 ## How it works
 
 Firefox has no network interface of its own. It shares Gluetun's network namespace
-(`network_mode: service:gluetun`). Gluetun holds the WireGuard tunnel and a firewall
-kill switch (`FIREWALL_OUTBOUND_SUBNETS: ""`) that drops all non-tunnel traffic. The
-kill switch is part of the network layout, so it cannot silently fail the way a
-toggle might: if Gluetun is not up, there is no route.
+(`network_mode: service:gluetun`), so it uses Gluetun's interfaces, routes and
+firewall. Gluetun holds the WireGuard tunnel, and its firewall is the kill switch: it
+drops everything except the tunnel itself (the encrypted connection to the VPN server
+and the traffic inside it), with one built-in exception, the Docker network the
+container sits on. `FIREWALL_OUTBOUND_SUBNETS: ""` adds no further exceptions. The
+namespace alone does not prevent leaks; the firewall does, so a firewall mistake
+would be a leak. That is why the kill switch is tested rather than
+assumed: `verify.sh` checks it, and a packet capture checked it while the tunnel
+changed state (see [What has been tested](#what-has-been-tested)).
+
+If Gluetun's container restarts (after a crash or a `docker restart`, for example),
+Firefox is left in the old, dead namespace and reaches nothing until it is restarted
+(see [Troubleshooting](#troubleshooting)). A tunnel reconnect inside a running
+Gluetun does not do this.
 
 Because the containers share one namespace, all ports are published on the gluetun
-service, and everything binds to `127.0.0.1`. Nothing is exposed to your LAN.
+service. The one published port binds to `127.0.0.1`, so it is not exposed to your
+LAN. Other containers on the same Docker network can still connect to the
+namespace's ports directly; see the table under
+[What you are trusting](#what-you-are-trusting).
+
+## What has been tested
+
+These results come from one host, running the versions in the dates at the top. The
+test scripts were written with Claude Code and run by me; they are not an independent
+test.
+
+**Network boundary** (2026-09-24, connection attempts from inside the browser's
+namespace):
+
+- Reached: another container on the same Docker network, and the host's own address
+  on that network. Through that address the browser reaches any host port that
+  accepts connections there: three of the six tried answered, including a port
+  Docker publishes for another container on all interfaces (no `127.0.0.1` prefix).
+  Which ports answer depends on your host's firewall and Docker's rules.
+- Not reached: the one LAN address and the one address on another private network
+  of the host that were tried. The namespace routes them into the tunnel.
+- The stack does not block the Docker-network path. If the browser must not reach a
+  service on your host, restrict it on the host side, for example by binding it (or
+  publishing it) on `127.0.0.1` only.
+
+**Leaks while the tunnel changes state** (2026-09-26): a packet capture on all of the
+host's interfaces during four events, while a probe inside the browser container,
+running as the browser's user, tried an IPv4 address, an IPv6 address, a DNS lookup,
+raw UDP, a LAN address and the Docker gateway every 2 seconds:
+
+| Event | Packets captured / dropped by the capture | Leaks |
+|---|---|---|
+| `docker compose down`, 20 s fully down, then up | 144,548 / 0 | 0 (Firefox did not exist while the tunnel was down, so the probe could not run) |
+| VPN stopped through Gluetun's control API for 60 s, Gluetun still running | 62,662 / 0 | 0 |
+| `docker restart gluetun-proton`, then Firefox | 139,155 / 0 | 0 |
+| `docker compose up -d --force-recreate` | 129,170 / 0 | 0 |
+
+In every event, nothing left the browser's namespace except to the Docker network or
+to a VPN server Gluetun had used. With the VPN stopped and Gluetun running, no probe
+got through to the internet or the LAN for the whole 60 seconds, while the Docker
+gateway stayed reachable. No IPv6 packet left the namespace in any event; its Docker
+interface has IPv6 disabled. Two side observations: after each reconnect the
+namespace answered the previous VPN server's packets with ICMP "port unreachable"
+messages, which travel outside the tunnel, but only to that server, and carry only a
+copy of the encrypted packet it had sent; and Gluetun picked a different server in
+the same country on every reconnect.
+
+**Not tested:**
+
+- a host reboot, or recreating the Docker network (the first event kept it);
+- traffic the host sends on the namespace's behalf, such as Docker's embedded DNS
+  server, which the capture cannot tell apart from the host's own traffic;
+- tunnel outages longer than 60 seconds, other hosts, other VPN providers;
+- whether another host gets the same browser fingerprint (see
+  [Does a fresh session get a new fingerprint?](#does-a-fresh-session-get-a-new-fingerprint));
+- the connections Safe Browsing makes if you turn it back on;
+- supply-chain checks: CI scans only the Firefox image for CVEs, not Gluetun or
+  nginx, and the build is not reproducible (each rebuild installs the current
+  package versions).
 
 ## Requirements
 
@@ -172,19 +288,20 @@ service, and everything binds to `127.0.0.1`. Nothing is exposed to your LAN.
 
 Start the stack with `./launch.sh` and stop it with `docker compose down`. Stopping
 wipes the whole profile (bookmarks, logins, history, cookies, and downloads) by
-design, since it all lives in RAM. Nothing is written to a host folder, so upload
+design, since it all lives in RAM. The browser writes none of it to a host folder, so upload
 anything you download to a cloud drive or email before you stop the stack. The tunnel
 stays up whenever the stack runs, so remove `restart: unless-stopped` from the
 services if you want it to run only on demand.
 
 ## Troubleshooting
 
-If Gluetun restarts or reconnects (a crash, a `docker restart`, or an image update),
+If Gluetun's container restarts (a crash, a `docker restart`, or an image update),
 the Firefox container stays attached to the old, now-dead network namespace. The
 symptom is that the web UI at `https://127.0.0.1:7814` becomes unreachable and the
-browser cannot load anything. This is the kill switch doing its job, Firefox fails
-closed so nothing leaks during the gap, but it does not self-heal, because Firefox
-keeps running and its own restart policy never fires. Reattach it to the live tunnel:
+browser cannot load anything. This fails closed: in testing, a Firefox left in the
+dead namespace reached nothing (see [What has been tested](#what-has-been-tested)).
+But it does not self-heal, because Firefox keeps running and its own restart policy
+never fires. Reattach it to the live tunnel:
 
 ```
 docker restart private-firefox
@@ -267,11 +384,11 @@ Changing any of these without reading can break the stack or weaken it. You will
 | Setting | Why it is set this way |
 |---|---|
 | `BLOCK_MALICIOUS: "off"` | Turning it on can push Gluetun's DNS resolver into a restart loop on some providers, so DNS stops resolving. Your provider's own malware blocking already covers this. |
-| `FIREWALL_OUTBOUND_SUBNETS: ""` | Blocks LAN access too, which is what makes the kill switch total. |
-| Ports on `gluetun`, `127.0.0.1:` prefix | They have to live on Gluetun (shared namespace) and stay loopback-bound, never exposed to the LAN. |
+| `FIREWALL_OUTBOUND_SUBNETS: ""` | Adds no LAN exceptions to Gluetun's firewall, so LAN addresses go into the tunnel or nowhere. It does not remove Gluetun's built-in exception for the Docker network the container sits on; see [What has been tested](#what-has-been-tested). |
+| Ports on `gluetun`, `127.0.0.1:` prefix | They have to live on Gluetun (shared namespace). The `127.0.0.1:` prefix keeps the published port off your LAN; containers on the same Docker network can still reach the namespace's ports directly. |
 | `SECURE_CONNECTION: 1` and `WEB_AUTHENTICATION: 1` | TLS plus an HTTPS login page for the web UI. Credentials are a bcrypt hash in a host-mounted `webauth-htpasswd` file, so they are not plaintext and not readable via `docker inspect`. This replaces the older `VNC_PASSWORD` (capped at 8 characters, exposed via `docker inspect`). The file is mounted read-write because the image's init sets its permissions at startup; note this is the one host file the browser container can write, so a compromised container could rewrite the hash (worst case: lock you out, or persist its own login to the loopback UI) — a minor channel an attacker already inside the container gains little from. |
-| `HTTP_CONTROL_SERVER_AUTH_DEFAULT_ROLE` (API key from `.env`) | Gluetun's control server listens on `:8000` inside the container, reachable from the browser's own namespace and from any container on the compose network. By default v3.41 answers some routes without credentials, including one that stops the VPN. This role puts every route behind the key. Nothing in this stack calls the API. Like the WireGuard key, the value is visible to anyone who can run `docker inspect`. |
-| `VNC_LISTENING_PORT: "-1"` | Turns off the image's raw VNC port (`:5900`), which offered no password: the web login does not cover it. The web UI does not use that port, so it keeps working. |
+| `HTTP_CONTROL_SERVER_AUTH_DEFAULT_ROLE` (API key from `.env`) | Gluetun's control server listens on `:8000` inside the container, reachable from the browser's own namespace and from any container on the compose network. By default v3.41 answers some routes without credentials: in testing the VPN status route did, and per Gluetun's source so does the route that stops the VPN. This role puts every route behind the key (per the source; tested: without the key, reading the status, version and settings, and a request to change the VPN status, all get 401). Nothing in this stack calls the API. Like the WireGuard key, the value is visible to anyone who can run `docker inspect`. |
+| `VNC_LISTENING_PORT: "-1"` | Turns off the image's raw VNC port (`:5900`), which offered no password: the web login does not cover it. The web UI does not use that port, so it keeps working. Tested: after the change nothing listens on `:5900`, and the web login still works. |
 | `/config` as a quoted tmpfs, `mode=0755` | Ephemeral profile. Keep the quotes: YAML otherwise strips the leading zero from `0755` and the container will not start. |
 | `webgl.disabled=true` | Removes an identifying WebGL hash. Breaks 3D sites and web maps. |
 | Gluetun pinned by digest | Update deliberately. Minor versions can rename settings (v3.41 renamed the `DOT*` DNS options), so they are bumped by hand; change the tag and digest together, then re-run the leak tests. The image runs its own healthcheck (it tests tunnel connectivity), so there is no custom healthcheck to maintain. |
@@ -315,11 +432,11 @@ These are the questions a careful reviewer tends to raise. Where a setting looks
 
 ### Why is there no `user.js` with hundreds of tweaks?
 
-The protections that matter come from the architecture rather than a long preference list. The profile is wiped every session (tmpfs), all traffic is forced through the VPN's network namespace, and Firefox's `resistFingerprinting` (RFP) handles most fingerprint normalization. A full arkenfox-style `user.js` was considered and set aside as largely redundant here, since its highest-value settings for disk avoidance, DNS handling, and WebRTC are already delivered by tmpfs, the VPN container, and the shared namespace. Fewer knobs means less to misconfigure or let fall out of date. The prefs that are set (RFP, letterboxing, telemetry off, and turning off link prefetch, speculative connections, and search suggestions) each add something the architecture does not. The rest switch off features Mozilla's own build adds: Google Safe Browsing, the built-in VPN button, and sponsored New Tab content.
+The protections that matter come from the architecture rather than a long preference list. The profile is wiped every session (tmpfs), all internet traffic goes through the VPN tunnel (enforced by Gluetun's firewall in the shared network namespace), and Firefox's `resistFingerprinting` (RFP) handles most fingerprint normalization. A full arkenfox-style `user.js` was considered and set aside as largely redundant here, since its highest-value settings for disk avoidance, DNS handling, and WebRTC are already delivered by tmpfs, the VPN container, and the shared namespace. Fewer knobs means less to misconfigure or let fall out of date. The prefs that are set (RFP, letterboxing, telemetry off, and turning off link prefetch, speculative connections, and search suggestions) each add something the architecture does not. The rest switch off features Mozilla's own build adds: Google Safe Browsing, the built-in VPN button, and sponsored New Tab content.
 
 ### Why are only about 3 fonts detected?
 
-Three is the target. A container with almost no fonts stands out, so the image installs Noto (including emoji and CJK), Liberation, FreeFont, and DejaVu to look like an ordinary Linux desktop. It reports about 3 of the 51 fonts a common probe checks. Debian's Noto package adds four rarer script families that the probe also lists (Canadian Aboriginal, Gunjala Gondi, Masaram Gondi, Yezidi), so the Dockerfile removes them; with them the probe saw 7. The other 48 are Windows and macOS families that no Debian package provides, and installing lookalikes would create inconsistency signals worse than the gap.
+Three is the target. A container with almost no fonts is an obvious outlier, so the image installs Noto (including emoji and CJK), Liberation, FreeFont, and DejaVu to remove that one signal. It does not make the browser match any particular group of users. It reports about 3 of the 51 fonts a common probe checks. Debian's Noto package adds four rarer script families that the probe also lists (Canadian Aboriginal, Gunjala Gondi, Masaram Gondi, Yezidi), so the Dockerfile removes them; with them the probe saw 7. The other 48 are Windows and macOS families that no Debian package provides. Lookalike fonts were left out on judgement, not measurement: they seemed more likely to add inconsistencies than to remove a signal.
 
 ### Why is Safe Browsing off?
 
@@ -329,11 +446,21 @@ Mozilla's own Firefox build ships Google Safe Browsing keys, so with the default
 
 This was tested rather than assumed, because it is a real trade-off.
 
-With RFP on and WebGL enabled, Firefox masks the renderer string to a generic `Mozilla` value, so the underlying software renderer such as `llvmpipe` never leaks, and it randomizes the canvas readback each session. That is the case for leaving WebGL on.
+With RFP on and WebGL enabled, Firefox masks the renderer string to a generic `Mozilla` value, so the underlying software renderer such as `llvmpipe` never leaks, and it randomizes canvas readback. That is the case for leaving WebGL on.
 
 Enabling it also exposes the WebGL capability set, meaning dozens of parameters and extension names, as a stable hash that does not change between sessions. This container renders in software because it has no GPU, so that capability set reflects the software graphics stack and is more likely to differ from a typical hardware-GPU user than to blend in. RFP normalizes the renderer string but leaves this capability list alone.
 
-Disabling WebGL removes that surface. A browser with no WebGL is also a normal posture among privacy-conscious users, since it is what the Tor Browser's "Safer" security level does. A browser running RFP is already identifiable as an RFP browser, so the realistic crowd to blend into is other RFP users, and WebGL-off is common there. Given the choice between a masked renderer that still carries a stable software-capability fingerprint and no WebGL surface at all, disabling exposes less. The cost is that 3D sites and web maps will not render, which is acceptable for this browser.
+Disabling WebGL removes that surface. A browser running RFP is already identifiable as an RFP browser, so blending in with ordinary browsers is not on offer; the question is how much more it exposes. How common WebGL-off is among RFP users has not been measured. Given the choice between a masked renderer that still carries a stable software-capability fingerprint and no WebGL surface at all, disabling exposes less. The cost is that 3D sites and web maps will not render, which is acceptable for this browser.
+
+### Does a fresh session get a new fingerprint?
+
+No. In testing, wiping the profile did not change the browser's fingerprint. In a test on one host (2026-09-26), the graphical browser loaded a self-hosted CreepJS in three fresh sessions (`docker compose down`, then `up`), once twice in the same session. All four loads produced the same CreepJS fingerprint ID, and 22 of its 23 sections were identical:
+
+| Identical in all four loads | Changed |
+|---|---|
+| navigator, worker scope, window features, headless checks, HTML element version, CSS and CSS media, screen, media types, maths, console errors, time zone, client rects, offline audio, fonts, lies, trash, captured errors, SVG, resistance, Intl, features | canvas 2D, on every page load, including the two loads in one session |
+
+So a site that fingerprints can link your sessions to each other even though the profile is gone. RFP removes obvious signals; it does not make the browser match a larger population, and it does not make fresh sessions unlinkable. Whether a different host gets the same fingerprint was not tested.
 
 ### Does the container leak your locale or timezone?
 
@@ -345,30 +472,34 @@ The property that matters is encrypted DNS that never touches your ISP, and that
 
 ### Is it really amnesic?
 
-The profile, yes, when you stop the stack with `docker compose down`. The entire browser profile, meaning cookies, history, logins, cache, and downloads, lives in a RAM-backed tmpfs and is discarded with the container. There is no persistent downloads folder by design, so anything you fetch is wiped too; save it off the browser first if you need to keep it. Places outside the profile (container logs, and traces on your own machine such as a clipboard manager) have not yet been checked for browsing data, so this answer covers the profile only.
+The profile, yes, when you stop the stack with `docker compose down`. The entire browser profile, meaning cookies, history, logins, cache, and downloads, lives in a RAM-backed tmpfs and is discarded with the container. There is no persistent downloads folder by design, so anything you fetch is wiped too; save it off the browser first if you need to keep it.
 
-One honest caveat: tmpfs pages can be pushed to swap under memory pressure, and on a host with unencrypted swap those fragments can touch disk. If that matters to you, encrypt your swap or turn it off. On a host with encrypted swap this is already covered.
+This was tested on one host (2026-09-26) with unique test strings in a visited URL, a form field and a downloaded file. While the stack ran, each string was in the RAM profile, and none was in the container's on-disk layer, its Docker logs, or the host folders the stack mounts. After `docker compose down`, the container's on-disk layer and log directory were gone, no Docker volume had been created, and none of the strings was in the host journal, `/var/log` or the mounted folders. That covers the places checked; it is not a forensic search, and swap and RAM were not searched.
+
+One trace was found on the host, outside the stack: the web UI's clipboard panel. The panel held the address of a page open in the container browser (it was never typed on the host, and how it got into the panel was not established), and the host Firefox used to view the web UI saved the panel's text in one of its session-restore backup files (`sessionstore-backups/` in its profile). That file is outside the stack, so `docker compose down` does not remove it; how long Firefox keeps it was not checked. Opening the web UI in a private window, or setting `browser.sessionstore.privacy_level` to `2` in the viewing browser, may prevent this; neither has been tested. A clipboard manager on the host would likewise keep anything copied out of the container.
+
+Another caveat: tmpfs pages can be pushed to swap under memory pressure, and on a host with unencrypted swap those fragments can touch disk. If that matters to you, encrypt your swap or turn it off. On a host with encrypted swap this is already covered.
 
 ### Doesn't the clipboard bridge weaken the isolation?
 
-A little, and it is worth being precise about. Clipboard sharing is a built-in feature of jlesage's web UI, not something this stack adds, and there is no environment variable to turn it off. Two paths exist: a manual clipboard box in the control panel, and automatic synchronization that activates in Chromium-based viewers served over HTTPS. Both are bidirectional, container to host as well as host to container, so treat the clipboard as a real channel in both directions. It is reachable only over the loopback-bound web UI, so nothing on your LAN can touch it. If that channel matters to you, do not paste through the control panel, and view the UI in a browser that does not trigger the automatic sync.
+A little, and it is worth being precise about. Clipboard sharing is a built-in feature of jlesage's web UI, not something this stack adds, and there is no environment variable to turn it off. Two paths exist: a manual clipboard box in the control panel, and automatic synchronization that activates in Chromium-based viewers served over HTTPS. Both are bidirectional, container to host as well as host to container, so treat the clipboard as a real channel in both directions. It is reachable only over the loopback-bound web UI, so nothing on your LAN can touch it. If that channel matters to you, do not paste through the control panel, and view the UI in a browser that does not trigger the automatic sync. The panel's text can also end up on your disk through the viewing browser's session restore; see [Is it really amnesic?](#is-it-really-amnesic).
 
 ### About the security review
 
 The configuration was checked with an automated security review, Claude Code's `/security-review`, run in a separate session over the files in this repository. It reported no vulnerabilities within that scope. This is not a third-party human audit or a runtime penetration test. No automated review is a guarantee: a later review of these docs caught claims this one missed, an environment variable that did nothing and a downloads folder that did not actually persist, both since corrected. Treat it as one input, not a seal of approval, and check the design yourself: there is no custom service code, the risk surface is the configuration, the images and the scripts, and all of it is here to read alongside the verification steps.
 
-A later review, on 24 September 2026, was also by an AI reviewer: first the README alone, then the source. The source pass covered the files of the Gluetun v3.41.3 release (compose files, Dockerfile, the three host scripts, `ci/fingerprint.sh`, `ci/checks.mjs` and its baseline, the CI workflow, Dependabot config, README, `VERIFY-OUTPUT.md`, license). It had no Git metadata, so it is tied to that release's content, not a commit. It ran syntax checks, parsed the compose files, and ran the scripts against simulated `docker` and `curl`. It did not run the stack, a VPN or a browser. Its main finding was that the checks reported more confidence than their results justified; the scripts now report PASS, FAIL or INCOMPLETE with matching exit codes, and the wording above has been corrected. Its points about local-network reachability, behaviour while the tunnel changes state, and data outside the profile need runtime tests that have not been run yet. The statements that depend on them (no route to your LAN, the kill switch during reconnects, what survives outside the profile) are unchanged until those tests confirm or correct them.
+A later review, on 24 September 2026, was also by an AI reviewer: first the README alone, then the source. The source pass covered the files of the Gluetun v3.41.3 release (compose files, Dockerfile, the three host scripts, `ci/fingerprint.sh`, `ci/checks.mjs` and its baseline, the CI workflow, Dependabot config, README, `VERIFY-OUTPUT.md`, license). It had no Git metadata, so it is tied to that release's content, not a commit. It ran syntax checks, parsed the compose files, and ran the scripts against simulated `docker` and `curl`. It did not run the stack, a VPN or a browser. Its main finding was that the checks reported more confidence than their results justified; the scripts now report PASS, FAIL or INCOMPLETE with matching exit codes, and the wording above has been corrected. Its points about local-network reachability, behaviour while the tunnel changes state, and data outside the profile needed runtime tests. I ran those on one host on 24 and 26 September 2026, with scripts written with Claude Code, so they are not independent either. An access test in the same round found two open listeners, since closed (see the changelog), and the results led to the corrected statements about the LAN, the kill switch and what survives outside the profile. The results, and what they did not cover, are under [What has been tested](#what-has-been-tested).
 
 ## Related projects
 
 This stack combines well-known parts, and several projects overlap with pieces of it.
-None that I found combine the whole set: a namespace-level kill switch, fingerprint
+None that I found combine the whole set: a firewall kill switch in a shared namespace, fingerprint
 hardening, a profile wiped every session, and a self-hosted fingerprint test. How the
 closest ones compare:
 
 | Project | Browser in container | VPN | Kill switch | Fingerprint hardening | Ephemeral profile | Self-hosted FP test |
 |---|---|---|---|---|---|---|
-| this repo | yes | WireGuard | namespace | RFP | tmpfs | optional |
+| this repo | yes | WireGuard | Gluetun firewall | RFP | tmpfs | optional |
 | [Staubgeborener gist](https://gist.github.com/Staubgeborener/7899ad152cf39a2dda24e7c45272ea34) | yes | Gluetun | yes | no | no | no |
 | [mtzanidakis/vpnbrowser](https://github.com/mtzanidakis/vpnbrowser) | yes | WireGuard | unclear | no | no (persistent) | no |
 | [oseiskar/docker-vpn-browser](https://github.com/oseiskar/docker-vpn-browser) | yes (X11) | OpenVPN | no | no | yes | no |
@@ -384,6 +515,7 @@ interchangeable.
 
 ## Changelog
 
+- 2026-09-26: Ran the runtime tests the fourth review asked for, on one host, and rewrote the statements that depend on them. New section [What has been tested](#what-has-been-tested), with a list of what was not tested. The kill switch is now described as what it is, Gluetun's firewall in a shared namespace, not a property of the network layout. The browser can reach other containers on its Docker network and host ports that accept connections there; the LAN address tried was not reachable. A packet capture across four tunnel changes (stop, restart, recreate, VPN stopped for 60 seconds) found nothing leaving the browser's namespace except to the Docker network or a VPN server Gluetun had used. After `docker compose down` no test data was found in the places checked, but the host browser viewing the web UI kept the clipboard panel's text in its session-restore files. Fresh sessions kept the same browser fingerprint. Added [What you are trusting](#what-you-are-trusting): the components, their privileges, and who can reach which port. No configuration change; comments in `docker-compose.yml` reworded to match.
 - 2026-09-24: Three fixes to `verify.sh` from the reviewer's check of the previous release. The earlier entry's "never prints the host IP" was not true: when the comparison could not be made, the script printed the exit address, which is the host's own IP if the tunnel is not working. It now prints no address unless `SHOW_EXIT_IP=1` is set, and then only on a PASS. IPv4 addresses with leading zeros (`203.000.113.009`) are rejected instead of being compared as text, which could report a false PASS. A Ctrl+C while the script restores the tunnel no longer abandons the restore, and every Docker step while the tunnel is down has a time limit. The failure-path tests cover all three.
 - 2026-09-24: Closed two listeners found by an access test. Gluetun's control server now requires an API key on every route (`HTTP_CONTROL_SERVER_AUTH_DEFAULT_ROLE`); before, any container on the compose network, and the browser's own namespace, could read the VPN status and, per Gluetun's source, stop the VPN without credentials. The image's raw VNC port `:5900` is disabled (`VNC_LISTENING_PORT: "-1"`); it offered VNC with no password to the same neighbours. **Upgrading: add `GLUETUN_API_KEY` to your `.env` (see Setup) or, per its source, Gluetun will not start.**
 - 2026-09-24: Acted on a fourth review (see [About the security review](#about-the-security-review)). The scripts no longer report success they have not earned. `verify.sh` reports PASS, FAIL or INCOMPLETE with exit codes 0, 1 and 3; it compares IPv4 with IPv4, takes an optional `REAL_IP` for hosts behind a VPN, never prints the host IP, re-checks connectivity after restoring the tunnel, and restarts `creepjs-server` too. `update.sh` prints `UPDATED` only after the new image is running, Gluetun is healthy, Firefox reports a version and the web UI answers. `launch.sh` stops if `docker compose up` fails and waits for the web UI with one 30-second deadline. In the fingerprint job, a missing or empty CreepJS baseline now fails, the CreepJS download is re-fetched when its pinned commit changes, and `ci/fingerprint.sh` keeps the INCOMPLETE exit code. The DNS check in `ci/checks.mjs` now judges the resolver's identity (its network, AS13335 for Cloudflare) instead of its country, and reports INCOMPLETE when the test service returns no resolver. New failure-path tests (`ci/test-scripts.sh`, `ci/test-checks.mjs`) run in CI. The README now says what each observer sees, lists the scripts and the untrusted input they parse, limits the amnesia claim to the profile, and describes Safe Browsing's three connections to Google.

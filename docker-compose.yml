@@ -1,6 +1,7 @@
-# Private browser stack: Firefox in a container whose ONLY network path is a
-# WireGuard VPN tunnel (via Gluetun). If the tunnel drops, Firefox has no route
-# anywhere -- not even your LAN. See README.md.
+# Private browser stack: Firefox in a container whose only way to the internet is a
+# WireGuard VPN tunnel (via Gluetun). Gluetun's firewall is the kill switch: if the
+# tunnel drops, it blocks the internet and the LAN, but Gluetun always allows the
+# Docker network this stack sits on. See README.md, "What has been tested".
 
 services:
   gluetun:
@@ -20,7 +21,7 @@ services:
       WIREGUARD_ADDRESSES: ${WIREGUARD_ADDRESSES}
       SERVER_COUNTRIES: Singapore        # change to your preferred exit country
       FIREWALL: "on"
-      FIREWALL_OUTBOUND_SUBNETS: ""       # blocks the LAN too -> total kill switch
+      FIREWALL_OUTBOUND_SUBNETS: ""       # no LAN exceptions (the Docker network stays allowed)
       DNS_SERVER: "on"
       DNS_UPSTREAM_RESOLVERS: cloudflare
       BLOCK_MALICIOUS: "off"              # ON can break DNS on some providers; see README
@@ -82,7 +83,7 @@ services:
       FF_PREF_SPONSORED: "browser.newtabpage.activity-stream.showSponsored=false"
       FF_PREF_SPONSORED_TOPSITES: "browser.newtabpage.activity-stream.showSponsoredTopSites=false"
     # No persistent profile volume: downloads land in the tmpfs profile and are wiped
-    # on stop, like the rest of the profile. This is deliberate -- the stack is amnesic.
+    # on stop, like the rest of the profile. This is deliberate -- the profile is amnesic.
     # (The webauth-htpasswd mount below is a single credential file, not profile data.)
     tmpfs:
       - "/config:size=512m,uid=1000,gid=1000,mode=0755"   # ephemeral profile; keep the quotes
