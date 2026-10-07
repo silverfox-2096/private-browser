@@ -119,9 +119,10 @@ yourself under the Actions tab. It is not a one-time review:
 - **Trivy** builds the image and scans it for CVEs. It fails only on *fixable*
   High/Critical vulnerabilities, so a red badge means a patchable CVE is present.
   `./update.sh` rebuilds from the current base image and the current Mozilla
-  release. A badge that stays red after a rebuild means the fix has not reached
-  jlesage's base image or Debian yet, and nothing in this repo can close it. All
-  findings, fixable or not, are published to the repository's Security tab.
+  release, and upgrades the Debian packages that come with the base image. A
+  badge that stays red after a rebuild means the fix has not reached jlesage's
+  base image or Debian yet, and nothing in this repo can close it. All findings,
+  fixable or not, are published to the repository's Security tab.
 - **Fingerprint** builds the image, starts it without the VPN, and drives a headless
   copy of the browser against a self-hosted, pinned CreepJS. It fails if the user agent
   stops matching the installed Firefox, the time zone is not the one
@@ -515,6 +516,7 @@ interchangeable.
 
 ## Changelog
 
+- 2026-10-07: The weekly scan went red on seven fixable High-severity issues in OpenSSL and PCRE2, packages that come with jlesage's Debian base image. Debian had already published the fixes, but the build never upgraded packages that were already in the base: the move to Debian on 21 September did not carry over the upgrade step added on 7 September. Until now, the CI section's statement that a rebuild picks up any fix that has reached Debian was therefore not true. The build now runs `apt-get upgrade` before installing Firefox. Checked before pushing on the maintainer's own install: the rebuilt image passes `verify.sh` and the headless browser checks, and Trivy finds no fixable High or Critical issues.
 - 2026-09-26: Ran the runtime tests the fourth review asked for, on one host, and rewrote the statements that depend on them. New section [What has been tested](#what-has-been-tested), with a list of what was not tested. The kill switch is now described as what it is, Gluetun's firewall in a shared namespace, not a property of the network layout. The browser can reach other containers on its Docker network and host ports that accept connections there; the LAN address tried was not reachable. A packet capture across four tunnel changes (stop, restart, recreate, VPN stopped for 60 seconds) found nothing leaving the browser's namespace except to the Docker network or a VPN server Gluetun had used. After `docker compose down` no test data was found in the places checked, but the host browser viewing the web UI kept the clipboard panel's text in its session-restore files. Fresh sessions kept the same browser fingerprint. Added [What you are trusting](#what-you-are-trusting): the components, their privileges, and who can reach which port. No configuration change; comments in `docker-compose.yml` reworded to match.
 - 2026-09-24: Three fixes to `verify.sh` from the reviewer's check of the previous release. The earlier entry's "never prints the host IP" was not true: when the comparison could not be made, the script printed the exit address, which is the host's own IP if the tunnel is not working. It now prints no address unless `SHOW_EXIT_IP=1` is set, and then only on a PASS. IPv4 addresses with leading zeros (`203.000.113.009`) are rejected instead of being compared as text, which could report a false PASS. A Ctrl+C while the script restores the tunnel no longer abandons the restore, and every Docker step while the tunnel is down has a time limit. The failure-path tests cover all three.
 - 2026-09-24: Closed two listeners found by an access test. Gluetun's control server now requires an API key on every route (`HTTP_CONTROL_SERVER_AUTH_DEFAULT_ROLE`); before, any container on the compose network, and the browser's own namespace, could read the VPN status and, per Gluetun's source, stop the VPN without credentials. The image's raw VNC port `:5900` is disabled (`VNC_LISTENING_PORT: "-1"`); it offered VNC with no password to the same neighbours. **Upgrading: add `GLUETUN_API_KEY` to your `.env` (see Setup) or, per its source, Gluetun will not start.**

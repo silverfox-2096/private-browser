@@ -27,6 +27,15 @@ RUN gpg --batch --with-colons --import-options show-only --import /moz.asc \
 
 FROM jlesage/baseimage-gui:debian-13-v4.14.0
 
+# Upgrade the Debian packages that come with the base image. jlesage rebuilds
+# the base on its own schedule, so without this a rebuild keeps the base's
+# OpenSSL, PCRE2 etc. even after Debian ships a fix (Trivy, 2026-10-05).
+# Runs before Mozilla's repo is added, so only Debian packages are touched.
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y \
+       -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold \
+    && rm -rf /var/lib/apt/lists/*
+
 # Mozilla's APT repo, pinned above Debian so `firefox` can only come from it.
 COPY --from=mozkey /moz.asc /etc/apt/keyrings/packages.mozilla.org.asc
 RUN echo "deb [signed-by=/etc/apt/keyrings/packages.mozilla.org.asc] https://packages.mozilla.org/apt mozilla main" \
