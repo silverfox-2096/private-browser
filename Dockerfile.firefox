@@ -10,7 +10,7 @@
 
 # Source of the container glue copied at the end (launcher, profile init,
 # FF_PREF_* handler). Pinned to a release tag so the copied scripts do not move.
-FROM jlesage/firefox:v26.08.3 AS jlfirefox
+FROM jlesage/firefox:v26.09.1 AS jlfirefox
 
 # Fetch Mozilla's APT signing key and refuse to continue unless its fingerprint
 # matches the one Mozilla publishes. This stage is discarded after the build.
