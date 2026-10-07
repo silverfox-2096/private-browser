@@ -45,12 +45,25 @@ dc --profile test up -d firefox creepjs
 version=$(docker exec "$FF" firefox --version | sed -n 's/^Mozilla Firefox //p')
 echo "   Firefox ${version:?could not read the Firefox version}"
 
-echo "3/5 copy the profile (waits up to 60 s for it to exist)"
+echo "3/5 copy the profile once the FF_PREF_* handler is done (up to 60 s)"
+# /config is a tmpfs, rebuilt at every container start. The image's FF_PREF_* handler
+# touches an empty prefs.js, then appends one pref at a time, so "prefs.js exists" is
+# not enough: an early copy can miss resistFingerprinting. The handler is done when
+# every pref it writes is there (its rules: empty value skipped, NAME=UNSET removed),
+# or when Firefox, which starts only after it, has saved prefs.js (header line); that
+# save drops prefs equal to Firefox's defaults, so the first test alone can hang.
 for i in $(seq 1 30); do
-  docker exec -u 1000 "$FF" sh -c '[ -f /config/profile/prefs.js ] || exit 1;
+  docker exec -u 1000 "$FF" sh -c 'f=/config/profile/prefs.js; [ -f "$f" ] || exit 1;
+    if ! grep -q "^// Mozilla User Preferences" "$f"; then
+      env | grep "^FF_PREF_" | while IFS= read -r e; do
+        v=${e#*=}; [ -n "$v" ] || continue;
+        case "$v" in *=*) [ "${v#*=}" = UNSET ] && continue ;; esac;
+        grep -qF "user_pref(\"${v%%=*}\"," "$f" || exit 1;
+      done || exit 1;
+    fi;
     rm -rf /tmp/hlprof /tmp/hlhome; cp -r /config/profile /tmp/hlprof;
     rm -f /tmp/hlprof/lock /tmp/hlprof/.parentlock; mkdir -p /tmp/hlhome' && break
-  [ "$i" -eq 30 ] && { echo "FAIL: no /config/profile/prefs.js after 60 s"; exit 1; }
+  [ "$i" -eq 30 ] && { echo "FAIL: /config/profile/prefs.js missing, or FF_PREF_* handler not done, after 60 s"; exit 1; }
   sleep 2
 done
 
