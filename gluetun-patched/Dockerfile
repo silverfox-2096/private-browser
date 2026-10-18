@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
 # checkov:skip=CKV_DOCKER_2:Final stage inherits the pinned Gluetun connectivity healthcheck
 # checkov:skip=CKV_DOCKER_3:Gluetun init must configure interfaces and firewall as root
+# checkov:skip=CKV_DOCKER_4:ADD fetches the exact remote stable-source archive with SHA256 verification; COPY cannot fetch URLs
 FROM golang:1.27.2-alpine@sha256:f92b6ef800e499660581efdabdf25d9d817a9d124eaf900924f0504e7e27e12d AS source
 ADD --checksum=sha256:5f382f180780632afe57d9cba03978bc0524e469c8288f72e0f416a7749ac62c https://codeload.github.com/passteque/gluetun/tar.gz/3d1e20c5551e9cae1f9d938dc7b7214a6987f27e /tmp/upstream.tar.gz
 WORKDIR /src
