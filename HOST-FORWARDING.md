@@ -2,8 +2,8 @@
 
 2026-10-18, one Linux host, Docker Engine 29.9.1, patched stable-source Gluetun
 v3.41.3-pb1 and Firefox 158.0. This is an operator-run investigation, not an
-independent audit. The Compose change here is a review candidate, not evidence
-that an existing deployment has adopted it.
+independent audit. The Compose change was deployed on the tested host after
+operator approval; the live validation results below apply to that host.
 
 ## Observed before change
 
@@ -28,7 +28,7 @@ container process; ordinary local-name delegation needs no explicit selection.
 
 Set `services.gluetun.dns` to `[1.1.1.1, 1.0.0.1]`. Docker creates upstream
 sockets in the container network namespace for explicit servers. Gluetun's
-firewall and routing then constrain them. Normal local DNS still uses DoT;
+firewall and routing then constrain them. Normal public-name DNS still uses DoT;
 queries explicitly sent to Docker DNS use plain DNS inside WireGuard.
 Docker service-name resolution remains local. No image change is required.
 
@@ -60,11 +60,25 @@ Controls and observations:
   failed probes. Initial browser recovery checks encountered a remote DNS-test
   service database error; a later restoration run passed all seven checks.
 
-The exact immutable live image, Compose files and shared network were restored
-rather than deploying the candidate during the investigation. A deployment needs
-its own review and browser closure safeguards. Rollback restores the original
-Compose DNS field and the forwarding exposure; do not remove any automatic
-immutable-image override.
+The isolated investigation initially restored the original live configuration.
+The operator then approved deployment of the DNS-only change. Live UDP/TCP Docker
+DNS, default-resolver .lan/.internal questions and a browser-container wget were
+observed in the namespace without matching questions on host egress. A unique
+host DNS control was visible. Tunnel-up/down checks passed, followed by the
+standard network checks (4/4) and browser checks (7/7). Both live captures reported
+zero kernel drops. The tested immutable images, automatic override, shared network
+and unrelated backend were preserved; the maintenance gate was released.
+
+The first deployment attempt passed forwarding and network tests but received no
+usable exit-IP metadata in the browser checker. Its exit-IP and dependent WebRTC
+checks failed, triggering rollback. Rollback passed network 4/4 and browser 7/7.
+The unchanged deployment and checks were repeated successfully. The cause of the
+missing metadata was not established; the failed attempt remains in private
+evidence and was not counted as PASS.
+
+Deployment requires browser closure and the updater lock, a verified maintenance
+gate and zero connected viewers. Rollback restores the original Compose DNS field
+and the forwarding exposure; do not remove any automatic immutable-image override.
 
 ## Attribution and limits
 
