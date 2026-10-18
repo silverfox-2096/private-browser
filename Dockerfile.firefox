@@ -87,6 +87,11 @@ COPY --from=jlfirefox /usr/bin/membarrier_check /usr/bin/
 # 55-firefox.sh at start); COPY follows it and fails, so recreate the link.
 RUN ln -sf /config/machine-id /etc/machine-id
 
+# A host-controlled maintenance gate blocks new web sessions during updates.
+COPY --chmod=0644 maintenance.conf /opt/base/etc/nginx/private-browser-maintenance.conf
+RUN test "$(grep -c '^server {$' /opt/base/etc/nginx/default_site.conf)" -eq 1 \
+    && sed -i '/^server {$/a\    include /opt/base/etc/nginx/private-browser-maintenance.conf;' /opt/base/etc/nginx/default_site.conf
+
 RUN set-cont-env APP_NAME "Firefox" \
     && set-cont-env APP_VERSION "$(dpkg-query -W -f '${Version}' firefox)"
 

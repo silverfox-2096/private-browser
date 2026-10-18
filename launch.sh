@@ -21,6 +21,10 @@ if [ ! -f webauth-htpasswd ]; then
   echo "Missing webauth-htpasswd -- generate it first (see README Setup)." >&2
   exit 1
 fi
+if [ -e maintenance/active ]; then
+  echo "Private Browser is updating. Please try again shortly." >&2
+  exit 1
+fi
 if ! docker compose up -d; then
   echo "docker compose up failed -- not opening the browser." >&2
   exit 1

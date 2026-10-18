@@ -211,6 +211,12 @@ rm -f "$SD/calls"; bash "$W/launch.sh" >/dev/null 2>&1
 if command grep -q '^xdg-open' "$SD/calls"; then pass=$((pass+1)); echo "ok    launch: opens the UI when ready"
 else failn=$((failn+1)); echo "FAIL  launch: did not open the UI when ready"; fi
 
+mkdir -p "$W/maintenance"; touch "$W/maintenance/active"
+t "launch: updater gate blocks startup" 1 'is updating' '' $N
+if [ ! -e "$SD/calls" ]; then pass=$((pass+1)); echo 'ok    launch: gated launch never touches Docker';
+else failn=$((failn+1)); echo 'FAIL gated launch invoked a tool'; fi
+rm "$W/maintenance/active"
+
 echo "== ci/fingerprint.sh"
 SCRIPT=ci/fingerprint.sh ARGS=
 CJ="$W/ci/creepjs-docs"
