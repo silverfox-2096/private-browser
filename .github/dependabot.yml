@@ -51,6 +51,7 @@ updates:
       # Built locally from Dockerfile.firefox; not on any registry.
       - dependency-name: private-creepjs
       - dependency-name: private-firefox
+      - dependency-name: private-gluetun
       # Minor and major versions are bumped by hand, since they can rename
       # settings (README, "Gluetun pinned by digest"). Patch releases still come.
       - dependency-name: qmcgaw/gluetun
@@ -68,7 +69,7 @@ updates:
     cooldown:
       default-days: 7
 
-  # The opt-in stable-source VPN build is our maintenance responsibility.
+  # The stable-source VPN build is our maintenance responsibility.
   # Updates require review, an image scan and isolated VPN/browser checks.
   - package-ecosystem: gomod
     directory: /gluetun-patched

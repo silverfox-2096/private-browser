@@ -3,9 +3,10 @@
 **Deployed locally with operator approval on 2026-10-18.** The live VPN uses the
 immutable custom image below through an automatic Compose override. Live network
 checks passed 4/4, browser checks 7/7, and control API authentication passed.
-The default public Compose pin remains upstream stable; its failing companion
-scan remains visible. The build and CI changes are committed on the local review
-branch, not pushed or merged. No vulnerability exclusions were added.
+This review branch makes the patched build the default Compose VPN and scans
+that actual build in CI. The original failing upstream scan remains in evidence.
+Public main retains its previous default until this PR is merged. No vulnerability
+exclusions were added.
 
 ## Identities and changes
 
@@ -121,8 +122,8 @@ an overlay passed only with `-f` would be lost by those callers. The repository'
 `docker-compose.gluetun-candidate.yml` is a separate opt-in template for review,
 not an automatically active file. `pull_policy: never` prevents a registry lookup.
 Confirm the running image ID, health, authenticated API, verify.sh and browser
-checks after the swap. The local rollout script completed successfully; its logs are retained in task evidence. Default public compose remains upstream stable pending
-an explicit distribution/default-pin decision; this local image is not on a registry.
+checks after the swap. The local rollout script completed successfully; its logs are retained in task evidence. This branch builds the patched image locally by default; it does not require
+a published custom registry image. Public main changes only after merge.
 
 Rollback: under the same lock/gate, stop candidate VPN/browser, remove only the automatic override created by this rollout and run the original Compose definition, then restart Firefox so it joins
 the restored namespace. Preserve any pre-existing optional CreepJS state. Verify
@@ -148,8 +149,8 @@ verify its SHA256 before loading if Docker's local images have been removed.
 Rollout started 2026-10-18 13:33:11 UTC (19:03:11 IST), after explicit approval and
 renewed browser-closed confirmation. The automatic `docker-compose.override.yml`
 contains the exact local image ID and `pull_policy: never`. Existing updater,
-launcher and verify commands therefore retain this image. The upstream base
-Compose file remains unchanged; the override is part of the live configuration
+launcher and verify commands therefore retain this image. The deployed host base
+Compose file remains unchanged; the override is part of its live configuration
 and must be preserved with backups. Both current image identity and shared
 network identity were checked after verify.sh's stop/restore cycle. All 4 live
 network checks, 7 browser checks and authenticated/unauthenticated API checks
@@ -164,3 +165,18 @@ releasing the gate. Never run both VPN images with the same WireGuard credential
 The original image remains archived and was successfully restored/tested twice
 before deployment. It retains the 31-HIGH baseline, so rollback reintroduces those
 package findings. No other system or network recreation is needed.
+
+## Public default and existing installations
+
+This branch's default Compose builds `private-gluetun:v3.41.3-pb1` from this directory;
+there is no custom registry pull. Fresh installations build it when first started.
+The pinned upstream runtime image remains a build input, not the executable used
+at runtime: the patched Go binary replaces it. CI runs the upstream race tests and
+scans the actual resulting image, retaining all-severity JSON and build materials.
+
+An existing installation must deliberately build the VPN and apply its rollout
+protections; pulling images alone cannot update this local build. The deployed
+operator host uses an immutable-ID automatic override, so its Firefox updater
+continues to select the reviewed artifact. Do not remove that host override merely
+to synchronize repository files. Future VPN builds must receive a new review,
+scan and runtime validation before changing the override.
