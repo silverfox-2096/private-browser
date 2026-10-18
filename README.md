@@ -30,9 +30,9 @@ Three things to know before you start:
 - Not a one-click app. It needs Docker and a paid WireGuard VPN (this example uses Proton).
 - Closing it erases the browser's data. Bookmarks, logins, history, cookies, and downloads all live in RAM and are wiped when you stop the stack with `docker compose down`, by design. There is no persistent folder, so save anything you want to keep somewhere off the browser (a cloud drive, email) before you stop it. Your own machine can still keep traces, such as text from the web UI's clipboard panel; see [Is it really amnesic?](#is-it-really-amnesic).
 
-## No custom service code
+## Upstream services and a startup guard
 
-Nothing written for this project runs as a service. The stack is a Docker Compose
+The stack uses a short startup guard before browser initialization and a Docker Compose
 file that wires together three existing, independently maintained images (Gluetun,
 jlesage's GUI base, and nginx), plus a Dockerfile that installs Mozilla's Firefox
 and a few fonts.
@@ -628,3 +628,18 @@ validate both connectivity and blocking, and retain the old image for rollback.
 Do not run both VPNs with the same WireGuard credentials. See [the build,
 applicability and maintenance record](gluetun-patched/README.md). This local build
 adds a maintenance obligation until a maintained upstream stable fix is available.
+
+
+### Browser startup readiness
+
+`startup-guard.sh` runs before GUI initialization and waits for `tun0` plus an exact
+HTTP200 from Gluetun's loopback health endpoint. This also runs on Docker engine
+restarts, where Compose's startup health dependency is not a boot-time barrier.
+If readiness cannot be established, initialization fails closed and the restart
+policy can retry. The guard only contacts127.0.0.1:9999, ignores proxy settings and
+refuses redirects. Keep the script with Compose. The pinned Gluetun source starts
+this endpoint after firewall initialization and initially reports unhealthy.
+This addresses early browser startup; it does not restrict arbitrary manually
+started processes or close every host-relay/IPv6 or actual host-boot validation gap.
+The isolated fingerprint CI configuration explicitly uses `/init` because it has
+no VPN; never use that configuration for browsing.
