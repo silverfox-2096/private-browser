@@ -124,7 +124,7 @@ if (!CI) {
   await check('exitIp', async () => {
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
-        await go('https://ipinfo.io/json');
+        await go('https://ipinfo.io/');
         const reply = JSON.parse(await js(`fetch('/json', {
           signal: AbortSignal.timeout(8000), cache: 'no-store'
         }).then(async (r) => JSON.stringify({ status: r.status, ok: r.ok,
