@@ -26,7 +26,7 @@ jobs:
           WIREGUARD_ADDRESSES: 10.2.0.2/32
           GLUETUN_API_KEY: unused-in-scan
         run: |
-          docker compose config --format json > compose-resolved.json
+          docker compose --profile test config --format json > compose-resolved.json
           image=$(python3 -c 'import json,os; print(json.load(open("compose-resolved.json"))["services"][os.environ["SERVICE"]]["image"])')
           if [ "$SERVICE" = creepjs ]; then
             docker compose --profile test build --pull --no-cache creepjs
