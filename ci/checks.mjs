@@ -18,6 +18,7 @@
 // Writes /out/checks-out.json (summary) + /out/creep-full.json.
 // Exit 0 = every check PASS; 1 = any FAIL; 3 = none FAIL but some INCOMPLETE
 // (evidence missing: not a pass).
+import { isIP } from 'node:net';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 
 const EXPECT = process.env.EXPECT || '';
@@ -33,12 +34,16 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function open(url) {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(url);
-    ws.onopen = () => resolve(ws);
-    ws.onerror = () => reject(new Error('connect failed'));
+    const timer = setTimeout(() => {
+      reject(new Error('connect timeout'));
+      try { ws.close(); } catch { /* not connected */ }
+    }, 1000);
+    ws.onopen = () => { clearTimeout(timer); resolve(ws); };
+    ws.onerror = () => { clearTimeout(timer); reject(new Error('connect failed')); };
   });
 }
 
-// Firefox needs a few seconds to start; retry for up to 30 s.
+// Firefox needs a few seconds to start; bound each connection attempt as well as retries.
 let ws;
 for (let i = 0; i < 30 && !ws; i++) {
   try { ws = await open('ws://127.0.0.1:9222/session'); } catch { await sleep(1000); }
@@ -50,13 +55,18 @@ const pending = new Map();
 ws.onmessage = (ev) => {
   const msg = JSON.parse(ev.data);
   if (msg.id === undefined || !pending.has(msg.id)) return;  // events
-  const { resolve, reject } = pending.get(msg.id);
+  const { resolve, reject, timer } = pending.get(msg.id);
+  clearTimeout(timer);
   pending.delete(msg.id);
   msg.type === 'error' ? reject(new Error(`${msg.error}: ${msg.message}`)) : resolve(msg.result);
 };
 const send = (method, params = {}) => new Promise((resolve, reject) => {
   const id = nextId++;
-  pending.set(id, { resolve, reject });
+  const timer = setTimeout(() => {
+    pending.delete(id);
+    reject(new Error(`BiDi timeout: ${method}`));
+  }, 20000);
+  pending.set(id, { resolve, reject, timer });
   ws.send(JSON.stringify({ id, method, params }));
 });
 
@@ -87,7 +97,7 @@ async function check(name, fn) {
   console.log(`${result}  ${name}: ${typeof detail === 'string' ? detail : JSON.stringify(detail)}`);
 }
 
-await go(CI ? 'http://localhost:8080/' : 'https://ipinfo.io/');
+await go(CI ? 'http://localhost:8080/' : 'about:blank');
 const major = EXPECT.split('.')[0];
 if (major) {
   // RFP reports <major>.0 whatever the dot release.
@@ -107,10 +117,45 @@ await check('webglBlocked', async () => {
 });
 let exitIp = '';
 if (!CI) {
+  // Retry missing evidence only. A valid wrong-country observation is terminal;
+  // retries must never erase a security failure. Retain each attempt's diagnosis.
+  out.exitMetadataAttempts = [];
+  const observedExitIps = new Set();
   await check('exitIp', async () => {
-    const j = JSON.parse(await js("fetch('/json').then(r => r.text())"));
-    exitIp = j.ip;
-    return [j.country === COUNTRY, `${j.ip} ${j.country} ${j.org}`];
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        await go('https://ipinfo.io/json');
+        const reply = JSON.parse(await js(`fetch('/json', {
+          signal: AbortSignal.timeout(8000), cache: 'no-store'
+        }).then(async (r) => JSON.stringify({ status: r.status, ok: r.ok,
+          body: await r.text() }))`));
+        if (!reply.ok) throw new Error(`HTTP ${reply.status}`);
+        const j = JSON.parse(reply.body);
+        if (isIP(typeof j?.ip === 'string' ? j.ip : '')) {
+          observedExitIps.add(j.ip);
+          if (observedExitIps.size > 1) {
+            out.exitMetadataAttempts.push({ attempt, result: 'FAIL', ips: [...observedExitIps] });
+            return [false, 'inconsistent observed exit addresses: ' + [...observedExitIps].join(', ')];
+          }
+        }
+        const countryValid = typeof j?.country === 'string' && /^[A-Z]{2}$/.test(j.country);
+        if (countryValid && j.country !== COUNTRY) {
+          out.exitMetadataAttempts.push({ attempt, result: 'FAIL', country: j.country });
+          return [false, `country ${j.country}, expected ${COUNTRY}`];
+        }
+        if (!isIP(typeof j?.ip === 'string' ? j.ip : '') || !countryValid ||
+            typeof j?.org !== 'string' || !/^AS\d+\s+\S/.test(j.org)) {
+          throw new Error('missing or malformed ip/country/org metadata');
+        }
+        exitIp = j.ip;
+        out.exitMetadataAttempts.push({ attempt, result: 'PASS', ip: j.ip, country: j.country, org: j.org });
+        return [true, `${j.ip} ${j.country} ${j.org}`];
+      } catch (e) {
+        out.exitMetadataAttempts.push({ attempt, result: 'INCOMPLETE', detail: e.message, observedIps: [...observedExitIps] });
+      }
+      if (attempt < 3) await sleep(1000);
+    }
+    return ['INCOMPLETE', out.exitMetadataAttempts];
   });
   // Every ICE candidate's address + type. Pass = only mDNS .local names and the exit IP.
   await check('webrtc', async () => {
@@ -127,8 +172,9 @@ if (!CI) {
       pc.createOffer().then((o) => pc.setLocalDescription(o));
       setTimeout(done, 8000);
     })`));
+    if (!exitIp) return ['INCOMPLETE', { reason: 'validated exit-IP reference unavailable', seen }];
     const bad = seen.filter((c) => { const a = c.split(' ')[0]; return !a.endsWith('.local') && a !== exitIp; });
-    return [exitIp !== '' && bad.length === 0, seen];
+    return [bad.length === 0, seen];
   });
 
   // DNS resolver identity via bash.ws's JSON API: the BROWSER resolves 10 unique names
@@ -139,7 +185,7 @@ if (!CI) {
   await check('dnsLeak', async () => {
     const api = async (url, how) => {
       try {
-        const r = await fetch(url);
+        const r = await fetch(url, { signal: AbortSignal.timeout(8000), cache: 'no-store' });
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return await r[how]();
       } catch (e) { throw Object.assign(new Error(`bash.ws API: ${e.message}`), { incomplete: true }); }
@@ -165,6 +211,13 @@ if (!CI) {
         seen.push(`info: ${n} resolver(s) in HOME_CC=${HOME_CC} (informational, not gated)`);
       }
       if (foreign.length) return [false, [`${foreign.length} resolver(s) outside ${DNS_ASN}`, ...seen]];
+      const clientIps = list.filter((e) => e?.type === 'ip');
+      if (exitIp && clientIps.some((e) => isIP(typeof e.ip === 'string' ? e.ip : '') && e.ip !== exitIp)) {
+        return [false, ['inconsistent DNS-test client and exit addresses', ...seen]];
+      }
+      if (clientIps.some((e) => !isIP(typeof e.ip === 'string' ? e.ip : ''))) {
+        return ['INCOMPLETE', ['malformed DNS-test client address', ...seen]];
+      }
       if (!dns.length) return ['INCOMPLETE', ['no resolver identity returned', ...seen]];
       if (unknown.length) return ['INCOMPLETE', [`${unknown.length} resolver(s) with no ASN`, ...seen]];
       return [true, [`all ${dns.length} resolvers in ${DNS_ASN} (resolver identity, not path proof)`, ...seen]];
