@@ -1,0 +1,24 @@
+{
+  "deployed_image": "sha256:e8e565d3ca963f40239a7b0878681299ef0dc4ec5bfc5deca94402b554a25c06",
+  "started_utc": "2026-10-18T13:33:11Z",
+  "operator_approved": true,
+  "browser_closed_confirmed": true,
+  "live_network_checks": {
+    "passed": 4,
+    "failed": 0
+  },
+  "live_browser_checks": {
+    "passed": 7,
+    "failed": 0
+  },
+  "control_api_authentication": "PASS",
+  "shared_network_unchanged": true,
+  "vpn_health": "healthy",
+  "browser_running": true,
+  "maintenance_gate": "released",
+  "production_rollback_required": false,
+  "previous_rollback_tests": "original restored and verified after both isolated runs",
+  "startup_tunnel_absent_gap": "OPEN",
+  "host_originated_forwarding_gap": "OPEN",
+  "remote_ci": "not run; branch not pushed"
+}

@@ -408,7 +408,7 @@ Changing any of these without reading can break the stack or weaken it. You will
 | `VNC_LISTENING_PORT: "-1"` | Turns off the image's raw VNC port (`:5900`), which offered no password: the web login does not cover it. The web UI does not use that port, so it keeps working. Tested: after the change nothing listens on `:5900`, and the web login still works. |
 | `/config` as a quoted tmpfs, `mode=0755` | Ephemeral profile. Keep the quotes: YAML otherwise strips the leading zero from `0755` and the container will not start. |
 | `webgl.disabled=true` | Removes an identifying WebGL hash. Breaks 3D sites and web maps. |
-| Gluetun pinned by digest | Update deliberately. Minor versions can rename settings (v3.41 renamed the `DOT*` DNS options), so they are bumped by hand; change the tag and digest together, then re-run the leak tests. The image runs its own healthcheck (it tests tunnel connectivity), so there is no custom healthcheck to maintain. |
+| Gluetun built from pinned stable source | The local patched build pins upstream source, runtime base and Go toolchain, and locks module versions. Update deliberately and run the image scan, upstream tests and VPN/browser/firewall checks; see `gluetun-patched/README.md`. The inherited healthcheck tests tunnel connectivity. |
 | Firefox built locally | Installs Firefox from Mozilla's own APT repository (the signing key is checked against Mozilla's published fingerprint at build time) and adds fonts so you do not stand out with a near-empty font set. One consequence: `docker compose pull` will not update Firefox, so use `./update.sh`. |
 | Safe Browsing, built-in VPN, sponsored New Tab off | Mozilla's own build ships Google Safe Browsing keys, a built-in VPN button, and sponsored New Tab content. All three are switched off in `docker-compose.yml`; see the design notes. |
 | `FF_OPEN_URL: about:blank` | No third-party call on launch. Set it to `https://ipinfo.io/json` if you want an exit-IP check each start. |
@@ -558,8 +558,8 @@ MIT. See the `LICENSE` file. CreepJS is a separate project under its own license
 
 ### Companion image scans and build evidence
 
-The Companion image security workflow scans Gluetun's exact pinned digest and the
-locally built CreepJS nginx image on pushes, PRs and Mondays. Fixable HIGH/CRITICAL
+The Companion image security workflow builds and scans the patched stable Gluetun
+image and the locally built CreepJS nginx image on pushes, PRs and Mondays. Fixable HIGH/CRITICAL
 findings fail the job and its JSON report is preserved as an artifact. This is
 separate from the existing Firefox CI badge; check both workflows.
 
@@ -573,8 +573,24 @@ the output image digest and BuildKit's resolved base-image material digests in
 the job summary. These are build observations, not pins on Mozilla's moving APT
 repository.
 
-Known finding on 2026-10-18: the stable Gluetun v3.41.3 digest has 31 fixable
-HIGH/CRITICAL package findings in the local Trivy 0.70.0 scan (including repeated
-library findings across packages). Current upstream development still has five;
-we have not switched the stable VPN image to that development build. The expanded
-workflow intentionally exposes these findings rather than suppressing them.
+### Gluetun security remediation (2026-10-18)
+
+Compose now builds Gluetun locally from the exact stable v3.41.3 source, with a
+pinned Go 1.27.2 toolchain, locked patched dependencies and refreshed Alpine
+packages. This replaces the original upstream image's 31 HIGH package findings
+(28 CVEs, zero CRITICAL). Both original and patched scan evidence are retained in
+`gluetun-patched/evidence/`; no vulnerability exclusions were introduced.
+
+The tested patched image has zero CRITICAL/HIGH/MEDIUM/LOW findings and one UNKNOWN
+advisory for an unimported abandoned OpenPGP package. Upstream race tests, isolated
+VPN/browser/firewall tests and an approved local rollout passed (live network
+checks 4/4, browser checks 7/7, control API authentication). CI now builds/tests and
+scans this same patched recipe as the default VPN image; every CI build has its
+own identity and scan, since Alpine repositories can change.
+
+The ordinary Firefox updater does not rebuild the VPN. VPN maintenance is deliberate:
+build and scan a separate candidate, close the viewer, use maintenance protections,
+validate both connectivity and blocking, and retain the old image for rollback.
+Do not run both VPNs with the same WireGuard credentials. See [the build,
+applicability and maintenance record](gluetun-patched/README.md). This local build
+adds a maintenance obligation until a maintained upstream stable fix is available.

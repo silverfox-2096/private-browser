@@ -19,7 +19,7 @@ jobs:
         service: [gluetun, creepjs]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Read exact image pin from Compose
+      - name: Build and identify the exact Compose image
         env:
           SERVICE: ${{ matrix.service }}
           WIREGUARD_PRIVATE_KEY: unused-in-scan
@@ -28,14 +28,18 @@ jobs:
         run: |
           docker compose --profile test config --format json > compose-resolved.json
           image=$(python3 -c 'import json,os; print(json.load(open("compose-resolved.json"))["services"][os.environ["SERVICE"]]["image"])')
-          if [ "$SERVICE" = creepjs ]; then
-            docker compose --profile test build --pull --no-cache creepjs
+          if [ "$SERVICE" = gluetun ]; then
+            docker build --target test gluetun-patched
+            BUILDX_METADATA_PROVENANCE=max docker buildx build --load --target candidate --metadata-file gluetun-build-metadata.json -t "$image" gluetun-patched
           else
-            case "$image" in *@sha256:*) ;; *) echo 'Missing immutable image digest' >&2; exit 1 ;; esac
+            docker compose --profile test build --pull --no-cache creepjs
           fi
+          image=$(docker image inspect "$image" --format '{{.Id}}')
           echo "SCAN_IMAGE=$image" >> "$GITHUB_ENV"
+          # shellcheck disable=SC2016 # Markdown backticks are literal.
           printf '## %s\n\nImage: `%s`\n' "$SERVICE" "$image" >> "$GITHUB_STEP_SUMMARY"
       - name: Gate on fixable HIGH and CRITICAL vulnerabilities
+        if: env.SCAN_IMAGE != ''
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ${{ env.SCAN_IMAGE }}
@@ -45,10 +49,22 @@ jobs:
           format: json
           output: companion-${{ matrix.service }}.json
           exit-code: "1"
+      - name: Retain complete findings at all severities
+        if: always() && env.SCAN_IMAGE != ''
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.SCAN_IMAGE }}
+          scanners: vuln
+          format: json
+          output: companion-${{ matrix.service }}-full.json
+          exit-code: "0"
       - name: Preserve scan evidence even when the gate fails
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: companion-${{ matrix.service }}
-          path: companion-${{ matrix.service }}.json
+          path: |
+            companion-${{ matrix.service }}.json
+            companion-${{ matrix.service }}-full.json
+            gluetun-build-metadata.json
           if-no-files-found: warn
