@@ -30,9 +30,9 @@ Three things to know before you start:
 - Not a one-click app. It needs Docker and a paid WireGuard VPN (this example uses Proton).
 - Closing it erases the browser's data. Bookmarks, logins, history, cookies, and downloads all live in RAM and are wiped when you stop the stack with `docker compose down`, by design. There is no persistent folder, so save anything you want to keep somewhere off the browser (a cloud drive, email) before you stop it. Your own machine can still keep traces, such as text from the web UI's clipboard panel; see [Is it really amnesic?](#is-it-really-amnesic).
 
-## No custom service code
+## Upstream services and a startup guard
 
-Nothing written for this project runs as a service. The stack is a Docker Compose
+The stack uses a short startup guard before browser initialization and a Docker Compose
 file that wires together three existing, independently maintained images (Gluetun,
 jlesage's GUI base, and nginx), plus a Dockerfile that installs Mozilla's Firefox
 and a few fonts.
@@ -43,6 +43,16 @@ from outside the browser:
 - three host scripts: `launch.sh`, `update.sh` and `verify.sh`;
 - the CI scripts `ci/fingerprint.sh` and `ci/test-scripts.sh`;
 - the browser checks `ci/checks.mjs` and their test, `ci/test-checks.mjs`.
+
+The browser exit check validates IP, country and ASN metadata, checks HTTP status,
+and bounds requests to eight seconds. Missing evidence gets at most three attempts,
+with each diagnosis retained in `checks-out.json`; persistent unavailability is
+INCOMPLETE (exit 3). Wrong-country observations and inconsistent addresses still
+FAIL. WebRTC retains its observed candidates but is INCOMPLETE without a validated
+exit-IP reference. DNS API requests also have an eight-second deadline; a prohibited
+resolver identity still FAILs. The local updater treats FAIL and INCOMPLETE as
+unsuccessful validation and rolls back. These checks establish resolver identity;
+packet captures are needed to establish the network path.
 
 Some of it parses untrusted input: `verify.sh` reads JSON from ipinfo.io, and
 `checks.mjs` reads JSON from ipinfo.io and bash.ws.
@@ -197,6 +207,20 @@ would be a leak. That is why the kill switch is tested rather than
 assumed: `verify.sh` checks it, and a packet capture checked it while the tunnel
 changed state (see [What has been tested](#what-has-been-tested)).
 
+Docker's embedded resolver (`127.0.0.11`) remains reachable even though normal
+browser resolution uses Gluetun (`127.0.0.1`). Compose explicitly sets Docker's
+upstream DNS to `1.1.1.1` and `1.0.0.1`, so its upstream sockets are created inside
+the VPN namespace and subject to Gluetun's firewall. Inheriting a host loopback
+resolver can instead make Docker regenerate requests in the host namespace,
+bypassing that firewall. This was reproduced with uniquely identified UDP and
+TCP DNS requests on one Docker 29.9.1 host (2026-10-18). Gluetun also delegates
+local-name queries to Docker: synthetic `.lan` and `.internal` requests, including
+a wget process inside the browser container, reproduced the host path through the
+default resolver. Tested fully qualified public-name requests used Gluetun's DoT
+path. Explicit Docker-DNS queries use
+plaintext DNS within the VPN, while Gluetun public-name resolution uses DNS over TLS.
+This setting does not isolate services reachable on the shared Docker network.
+
 If Gluetun's container restarts (after a crash or a `docker restart`, for example),
 Firefox is left in the old, dead namespace and reaches nothing until it is restarted
 (see [Troubleshooting](#troubleshooting)). A tunnel reconnect inside a running
@@ -253,8 +277,8 @@ the same country on every reconnect.
 **Not tested:**
 
 - a host reboot, or recreating the Docker network (the first event kept it);
-- traffic the host sends on the namespace's behalf, such as Docker's embedded DNS
-  server, which the capture cannot tell apart from the host's own traffic;
+- arbitrary host services that could relay traffic from the allowed Docker
+  network; the identified Docker-DNS path is covered separately below;
 - tunnel outages longer than 60 seconds, other hosts, other VPN providers;
 - whether another host gets the same browser fingerprint (see
   [Does a fresh session get a new fingerprint?](#does-a-fresh-session-get-a-new-fingerprint));
@@ -262,6 +286,16 @@ the same country on every reconnect.
 - supply-chain checks: CI scans only the Firefox image for CVEs, not Gluetun or
   nginx, and the build is not reproducible (each rebuild installs the current
   package versions).
+
+**Host-originated DNS forwarding** (2026-10-18, Docker 29.9.1): unique DNS
+questions correlated across simultaneous namespace and host captures proved
+host regeneration via Docker's inherited host-loopback resolver, including with
+`tun0` absent. Compose's explicit upstreams contain that path inside the VPN
+namespace. In isolated before/after tests, UDP/TCP DNS and HTTPS positive controls
+worked with the tunnel up; with the tunnel absent, explicit Docker DNS failed and
+no corresponding question appeared on host egress. See
+[the bounded test record](HOST-FORWARDING.md) for controls and limitations. This
+is not a claim that arbitrary host services cannot proxy traffic.
 
 ## Requirements
 
@@ -594,3 +628,18 @@ validate both connectivity and blocking, and retain the old image for rollback.
 Do not run both VPNs with the same WireGuard credentials. See [the build,
 applicability and maintenance record](gluetun-patched/README.md). This local build
 adds a maintenance obligation until a maintained upstream stable fix is available.
+
+
+### Browser startup readiness
+
+`startup-guard.sh` runs before GUI initialization and waits for `tun0` plus an exact
+HTTP200 from Gluetun's loopback health endpoint. This also runs on Docker engine
+restarts, where Compose's startup health dependency is not a boot-time barrier.
+If readiness cannot be established, initialization fails closed and the restart
+policy can retry. The guard only contacts127.0.0.1:9999, ignores proxy settings and
+refuses redirects. Keep the script with Compose. The pinned Gluetun source starts
+this endpoint after firewall initialization and initially reports unhealthy.
+This addresses early browser startup; it does not restrict arbitrary manually
+started processes or close every host-relay/IPv6 or actual host-boot validation gap.
+The isolated fingerprint CI configuration explicitly uses `/init` because it has
+no VPN; never use that configuration for browsing.
