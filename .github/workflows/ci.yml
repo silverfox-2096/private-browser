@@ -49,7 +49,7 @@ jobs:
         run: |
           img=$(sed -n 's/^ *image: *\(hadolint\/.*\)/\1/p' ci/pins/compose.yml)
           docker run --rm -v "$PWD:/repo" -w /repo "${img:?no hadolint pin}" \
-            hadolint Dockerfile.firefox Dockerfile.creepjs
+            hadolint Dockerfile.firefox Dockerfile.creepjs gluetun-patched/Dockerfile
 
   checkov:
     runs-on: ubuntu-latest

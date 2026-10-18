@@ -21,7 +21,7 @@ updates:
   # Dockerfile.firefox: jlesage/firefox (glue scripts) and jlesage/baseimage-gui
   # move together, so they share one PR.
   - package-ecosystem: docker
-    directory: /
+    directories: ["/", "/gluetun-patched"]
     schedule:
       interval: weekly
       day: monday
@@ -51,6 +51,7 @@ updates:
       # Built locally from Dockerfile.firefox; not on any registry.
       - dependency-name: private-creepjs
       - dependency-name: private-firefox
+      - dependency-name: private-gluetun
       # Minor and major versions are bumped by hand, since they can rename
       # settings (README, "Gluetun pinned by digest"). Patch releases still come.
       - dependency-name: qmcgaw/gluetun
@@ -67,3 +68,12 @@ updates:
       time: "04:00"
     cooldown:
       default-days: 7
+
+  # The stable-source VPN build is our maintenance responsibility.
+  # Updates require review, an image scan and isolated VPN/browser checks.
+  - package-ecosystem: gomod
+    directory: /gluetun-patched
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:00"

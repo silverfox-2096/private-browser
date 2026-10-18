@@ -1,0 +1,8 @@
+# Opt-in only, after review of the recorded candidate and runtime evidence.
+# Supply a LOCAL immutable image ID (sha256:...), never a mutable tag.
+# Example: GLUETUN_CANDIDATE_IMAGE=sha256:<recorded-id> docker compose \
+#   -f docker-compose.yml -f docker-compose.gluetun-candidate.yml up -d
+services:
+  gluetun:
+    image: ${GLUETUN_CANDIDATE_IMAGE:?Set the reviewed local immutable candidate image ID}
+    pull_policy: never

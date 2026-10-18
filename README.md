@@ -44,6 +44,16 @@ from outside the browser:
 - the CI scripts `ci/fingerprint.sh` and `ci/test-scripts.sh`;
 - the browser checks `ci/checks.mjs` and their test, `ci/test-checks.mjs`.
 
+The browser exit check validates IP, country and ASN metadata, checks HTTP status,
+and bounds requests to eight seconds. Missing evidence gets at most three attempts,
+with each diagnosis retained in `checks-out.json`; persistent unavailability is
+INCOMPLETE (exit 3). Wrong-country observations and inconsistent addresses still
+FAIL. WebRTC retains its observed candidates but is INCOMPLETE without a validated
+exit-IP reference. DNS API requests also have an eight-second deadline; a prohibited
+resolver identity still FAILs. The local updater treats FAIL and INCOMPLETE as
+unsuccessful validation and rolls back. These checks establish resolver identity;
+packet captures are needed to establish the network path.
+
 Some of it parses untrusted input: `verify.sh` reads JSON from ipinfo.io, and
 `checks.mjs` reads JSON from ipinfo.io and bash.ws.
 
@@ -197,6 +207,20 @@ would be a leak. That is why the kill switch is tested rather than
 assumed: `verify.sh` checks it, and a packet capture checked it while the tunnel
 changed state (see [What has been tested](#what-has-been-tested)).
 
+Docker's embedded resolver (`127.0.0.11`) remains reachable even though normal
+browser resolution uses Gluetun (`127.0.0.1`). Compose explicitly sets Docker's
+upstream DNS to `1.1.1.1` and `1.0.0.1`, so its upstream sockets are created inside
+the VPN namespace and subject to Gluetun's firewall. Inheriting a host loopback
+resolver can instead make Docker regenerate requests in the host namespace,
+bypassing that firewall. This was reproduced with uniquely identified UDP and
+TCP DNS requests on one Docker 29.9.1 host (2026-10-18). Gluetun also delegates
+local-name queries to Docker: synthetic `.lan` and `.internal` requests, including
+a wget process inside the browser container, reproduced the host path through the
+default resolver. Tested fully qualified public-name requests used Gluetun's DoT
+path. Explicit Docker-DNS queries use
+plaintext DNS within the VPN, while Gluetun public-name resolution uses DNS over TLS.
+This setting does not isolate services reachable on the shared Docker network.
+
 If Gluetun's container restarts (after a crash or a `docker restart`, for example),
 Firefox is left in the old, dead namespace and reaches nothing until it is restarted
 (see [Troubleshooting](#troubleshooting)). A tunnel reconnect inside a running
@@ -253,8 +277,8 @@ the same country on every reconnect.
 **Not tested:**
 
 - a host reboot, or recreating the Docker network (the first event kept it);
-- traffic the host sends on the namespace's behalf, such as Docker's embedded DNS
-  server, which the capture cannot tell apart from the host's own traffic;
+- arbitrary host services that could relay traffic from the allowed Docker
+  network; the identified Docker-DNS path is covered separately below;
 - tunnel outages longer than 60 seconds, other hosts, other VPN providers;
 - whether another host gets the same browser fingerprint (see
   [Does a fresh session get a new fingerprint?](#does-a-fresh-session-get-a-new-fingerprint));
@@ -262,6 +286,16 @@ the same country on every reconnect.
 - supply-chain checks: CI scans only the Firefox image for CVEs, not Gluetun or
   nginx, and the build is not reproducible (each rebuild installs the current
   package versions).
+
+**Host-originated DNS forwarding** (2026-10-18, Docker 29.9.1): unique DNS
+questions correlated across simultaneous namespace and host captures proved
+host regeneration via Docker's inherited host-loopback resolver, including with
+`tun0` absent. Compose's explicit upstreams contain that path inside the VPN
+namespace. In isolated before/after tests, UDP/TCP DNS and HTTPS positive controls
+worked with the tunnel up; with the tunnel absent, explicit Docker DNS failed and
+no corresponding question appeared on host egress. See
+[the bounded test record](HOST-FORWARDING.md) for controls and limitations. This
+is not a claim that arbitrary host services cannot proxy traffic.
 
 ## Requirements
 
@@ -408,7 +442,7 @@ Changing any of these without reading can break the stack or weaken it. You will
 | `VNC_LISTENING_PORT: "-1"` | Turns off the image's raw VNC port (`:5900`), which offered no password: the web login does not cover it. The web UI does not use that port, so it keeps working. Tested: after the change nothing listens on `:5900`, and the web login still works. |
 | `/config` as a quoted tmpfs, `mode=0755` | Ephemeral profile. Keep the quotes: YAML otherwise strips the leading zero from `0755` and the container will not start. |
 | `webgl.disabled=true` | Removes an identifying WebGL hash. Breaks 3D sites and web maps. |
-| Gluetun pinned by digest | Update deliberately. Minor versions can rename settings (v3.41 renamed the `DOT*` DNS options), so they are bumped by hand; change the tag and digest together, then re-run the leak tests. The image runs its own healthcheck (it tests tunnel connectivity), so there is no custom healthcheck to maintain. |
+| Gluetun built from pinned stable source | The local patched build pins upstream source, runtime base and Go toolchain, and locks module versions. Update deliberately and run the image scan, upstream tests and VPN/browser/firewall checks; see `gluetun-patched/README.md`. The inherited healthcheck tests tunnel connectivity. |
 | Firefox built locally | Installs Firefox from Mozilla's own APT repository (the signing key is checked against Mozilla's published fingerprint at build time) and adds fonts so you do not stand out with a near-empty font set. One consequence: `docker compose pull` will not update Firefox, so use `./update.sh`. |
 | Safe Browsing, built-in VPN, sponsored New Tab off | Mozilla's own build ships Google Safe Browsing keys, a built-in VPN button, and sponsored New Tab content. All three are switched off in `docker-compose.yml`; see the design notes. |
 | `FF_OPEN_URL: about:blank` | No third-party call on launch. Set it to `https://ipinfo.io/json` if you want an exit-IP check each start. |
@@ -558,8 +592,8 @@ MIT. See the `LICENSE` file. CreepJS is a separate project under its own license
 
 ### Companion image scans and build evidence
 
-The Companion image security workflow scans Gluetun's exact pinned digest and the
-locally built CreepJS nginx image on pushes, PRs and Mondays. Fixable HIGH/CRITICAL
+The Companion image security workflow builds and scans the patched stable Gluetun
+image and the locally built CreepJS nginx image on pushes, PRs and Mondays. Fixable HIGH/CRITICAL
 findings fail the job and its JSON report is preserved as an artifact. This is
 separate from the existing Firefox CI badge; check both workflows.
 
@@ -573,8 +607,24 @@ the output image digest and BuildKit's resolved base-image material digests in
 the job summary. These are build observations, not pins on Mozilla's moving APT
 repository.
 
-Known finding on 2026-10-18: the stable Gluetun v3.41.3 digest has 31 fixable
-HIGH/CRITICAL package findings in the local Trivy 0.70.0 scan (including repeated
-library findings across packages). Current upstream development still has five;
-we have not switched the stable VPN image to that development build. The expanded
-workflow intentionally exposes these findings rather than suppressing them.
+### Gluetun security remediation (2026-10-18)
+
+Compose now builds Gluetun locally from the exact stable v3.41.3 source, with a
+pinned Go 1.27.2 toolchain, locked patched dependencies and refreshed Alpine
+packages. This replaces the original upstream image's 31 HIGH package findings
+(28 CVEs, zero CRITICAL). Both original and patched scan evidence are retained in
+`gluetun-patched/evidence/`; no vulnerability exclusions were introduced.
+
+The tested patched image has zero CRITICAL/HIGH/MEDIUM/LOW findings and one UNKNOWN
+advisory for an unimported abandoned OpenPGP package. Upstream race tests, isolated
+VPN/browser/firewall tests and an approved local rollout passed (live network
+checks 4/4, browser checks 7/7, control API authentication). CI now builds/tests and
+scans this same patched recipe as the default VPN image; every CI build has its
+own identity and scan, since Alpine repositories can change.
+
+The ordinary Firefox updater does not rebuild the VPN. VPN maintenance is deliberate:
+build and scan a separate candidate, close the viewer, use maintenance protections,
+validate both connectivity and blocking, and retain the old image for rollback.
+Do not run both VPNs with the same WireGuard credentials. See [the build,
+applicability and maintenance record](gluetun-patched/README.md). This local build
+adds a maintenance obligation until a maintained upstream stable fix is available.

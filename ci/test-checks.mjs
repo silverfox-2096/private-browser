@@ -18,8 +18,36 @@ process.on('exit', () => rmSync(SD, { recursive: true, force: true }));
 const STUB = String.raw`
 const E = process.env;
 const st = globalThis.setTimeout;
-globalThis.setTimeout = (f, _ms, ...a) => st(f, 0, ...a);   // no real waits
+globalThis.setTimeout = (f, _ms, ...a) => st(f, [1000, 20000].includes(_ms) ? 150 : 0, ...a);   // no real waits
 const EXIT = '203.0.113.9';
+let exitCalls = 0;
+AbortSignal.timeout = () => {
+  const controller = new AbortController();
+  st(() => controller.abort(new Error('timeout')), 30);
+  return controller.signal;
+};
+const exitFetch = async (_url, options) => {
+  if (!options.signal || options.cache !== 'no-store') throw new Error('missing deadline/cache policy');
+  const n = ++exitCalls;
+  const mode = E.S_EXIT === 'transient' && n > 1 ? 'ok' : E.S_EXIT === 'missingthenok' ? (n === 1 ? 'missing' : 'ok') : E.S_EXIT;
+  if (mode === 'timeout') return new Promise((_resolve, reject) => {
+    options.signal.addEventListener('abort', () => reject(new Error('timeout')), { once: true });
+  });
+  if (mode === 'down') throw new TypeError('fetch failed');
+  if (mode === 'http' || mode === 'transient') return new Response('{}', { status: 503 });
+  if (mode === 'malformed') return new Response('<html>not JSON</html>');
+  let j = { ip: EXIT, country: 'SG', org: 'AS64500 VPN' };
+  if (mode === 'missing') j = {};
+  if (mode === 'null') j = null;
+  if (mode === 'badip') j.ip = 'not-an-ip';
+  if (mode === 'noorg') delete j.org;
+  if (mode === 'inconsistent' && n === 1) { delete j.org; j.ip = '192.0.2.1'; }
+  if (mode === 'badcountry') j.country = 'Singapore';
+  if (mode === 'wrong') j.country = 'US';
+  if (mode === 'wrongmissing') { j.country = 'US'; delete j.ip; }
+  if (mode === 'wrongthenok' && n === 1) j.country = 'US';
+  return new Response(JSON.stringify(j));
+};
 const cf = (n) => ({ type: 'dns', ip: '198.51.100.' + n, country: 'sg', asn: 'AS13335 CloudFlare Inc' });
 const lists = {
   ok: [{ type: 'ip', ip: EXIT, country: 'sg', asn: 'AS64500 VPN' }, cf(1), cf(2), { type: 'conclusion' }],
@@ -29,6 +57,8 @@ const lists = {
   // Every resolver in Cloudflare, but located in the "home" country: identity says PASS.
   homecc: [cf(1), { type: 'dns', ip: '198.51.100.9', country: 'de', asn: 'AS13335 CloudFlare Inc' }],
   notlist: { error: 'rate limited' },
+  mismatch: [{ type: 'ip', ip: '192.0.2.1' }, cf(1)],
+  badclient: [{ type: 'ip', ip: 'bad' }, cf(1)],
 };
 const fp = E.S_FP === 'none' ? null : {
   fonts: { fontFaceLoadFonts: ['DejaVu Sans', 'Liberation Mono', 'Noto Color Emoji'] },
@@ -41,8 +71,8 @@ const answer = (x) => {
   if (x.includes('navigator.userAgent')) return 'Mozilla/5.0 rv:156.0 Firefox/156.0';
   if (x.includes('Intl.DateTimeFormat')) return 'Atlantic/Reykjavik';
   if (x.includes("getContext('webgl')")) return 'false';
-  if (x.includes("fetch('/json')")) return JSON.stringify({ ip: EXIT, country: 'SG', org: 'AS64500 VPN' });
-  if (x.includes('RTCPeerConnection')) return JSON.stringify(['abc.local host', EXIT + ' srflx']);
+  if (x.includes("fetch('/json'")) return new Function('fetch', 'AbortSignal', 'return ' + x)(exitFetch, AbortSignal);
+  if (x.includes('RTCPeerConnection')) return JSON.stringify(['abc.local host', (E.S_RTC === 'foreign' ? '192.0.2.77' : EXIT) + ' srflx']);
   if (x.includes('allSettled')) return 'ok';
   if (x.includes('window.Fingerprint')) return JSON.stringify(fp);
   throw new Error('stub: unexpected expression ' + x.slice(0, 40));
@@ -55,12 +85,21 @@ globalThis.WebSocket = class {
     switch (m.method) {
       case 'session.new': return reply({ capabilities: { browserVersion: '156.0.1' } });
       case 'browsingContext.getTree': return reply({ contexts: [{ context: 'c1' }] });
-      case 'script.evaluate': return reply({ type: 'success', result: { type: 'string', value: answer(m.params.expression) } });
+      case 'script.evaluate':
+        if (E.S_EXIT === 'bidi-timeout' && m.params.expression.includes("fetch('/json'")) return;
+        return Promise.resolve().then(() => answer(m.params.expression)).then(
+          value => reply({ type: 'success', result: { type: 'string', value } }),
+          error => reply({ type: 'exception', exceptionDetails: { text: error.message } }));
       default: return reply({});
     }
   }
 };
-globalThis.fetch = async (url) => {
+globalThis.fetch = async (url, options) => {
+  if (!options.signal) throw new Error('missing API deadline');
+  if (E.S_API === 'timeout') return new Promise((_resolve, reject) => {
+    options.signal.addEventListener('abort', () => reject(new Error('timeout')), { once: true });
+  });
+  if (E.S_API === 'badjson' && url !== 'https://bash.ws/id') return new Response('<html>');
   if (E.S_API === 'down') throw new TypeError('fetch failed');
   if (url === 'https://bash.ws/id') return new Response(E.S_ID ?? 'abc123');
   if (E.S_API === '500') return new Response('oops', { status: 500 });
@@ -109,6 +148,35 @@ t('HOME_CC is informational only', 0, /1 resolver\(s\) in HOME_CC=de \(informati
   { S_DNS: 'homecc', HOME_CC: 'DE' });
 t('DNS_ASN selects the provider', 1, /^FAIL {2}dnsLeak: .*outside AS64511/m, null, { DNS_ASN: 'AS64511' });
 t('FAIL outranks INCOMPLETE', 1, /^FAIL: creepjs/m, null, { S_DNS: 'empty', S_CORES: '8' });
+
+console.log('== exit metadata failure paths');
+for (const mode of ['missing', 'null', 'malformed', 'badip', 'badcountry', 'noorg', 'http', 'down', 'timeout', 'bidi-timeout']) {
+  const r = t('exit ' + mode, 3, /^INCOMPLETE {2}exitIp/m, /^PASS {2}(exitIp|webrtc)/m, { S_EXIT: mode });
+  const report = JSON.parse(readFileSync(join(r.o, 'checks-out.json'), 'utf8'));
+  if (report.exitMetadataAttempts.length === 3 && report.checks.webrtc.result === 'INCOMPLETE' &&
+      report.checks.webrtc.detail.seen.length === 2) {
+    pass++; console.log('ok    three attempts, dependent observations retained: ' + mode);
+  } else { failn++; console.log('FAIL  attempt/dependency evidence: ' + mode); }
+}
+const recovered = t('transient exit HTTP recovery', 0, /^PASS {2}exitIp/m, /^INCOMPLETE {2}webrtc/m, { S_EXIT: 'transient' });
+const attempts = JSON.parse(readFileSync(join(recovered.o, 'checks-out.json'), 'utf8')).exitMetadataAttempts;
+if (attempts.length === 2 && attempts[0].result === 'INCOMPLETE' && attempts[1].result === 'PASS') {
+  pass++; console.log('ok    transient failure retained');
+} else { failn++; console.log('FAIL  transient failure not retained'); }
+for (const mode of ['wrong', 'wrongmissing', 'wrongthenok']) {
+  const r = t('wrong country ' + mode, 1, /^FAIL {2}exitIp: country US/m, /^PASS {2}(exitIp|webrtc)/m, { S_EXIT: mode });
+  if (JSON.parse(readFileSync(join(r.o, 'checks-out.json'), 'utf8')).exitMetadataAttempts.length === 1) {
+    pass++; console.log('ok    wrong country never retried: ' + mode);
+  } else { failn++; console.log('FAIL  wrong country retried'); }
+}
+t('missing metadata recovers', 0, /^PASS {2}exitIp/m, /^INCOMPLETE {2}webrtc/m, { S_EXIT: 'missingthenok' });
+t('exit inconsistent after incomplete metadata', 1, /^FAIL {2}exitIp: inconsistent observed/m, /^PASS {2}webrtc/m, { S_EXIT: 'inconsistent' });
+t('DNS client disagrees with exit', 1, /^FAIL {2}dnsLeak: .*inconsistent/m, null, { S_DNS: 'mismatch' });
+t('DNS client malformed', 3, /^INCOMPLETE {2}dnsLeak: .*malformed/m, null, { S_DNS: 'badclient' });
+t('WebRTC foreign address', 1, /^FAIL {2}webrtc/m, null, { S_RTC: 'foreign' });
+t('DNS prohibited identity still FAIL without exit reference', 1, /^FAIL {2}dnsLeak/m, /^PASS {2}webrtc/m, { S_EXIT: 'missing', S_DNS: 'foreign' });
+t('DNS timeout', 3, /^INCOMPLETE {2}dnsLeak/m, /^ALL PASS/m, { S_API: 'timeout' });
+t('DNS malformed JSON', 3, /^INCOMPLETE {2}dnsLeak/m, /^ALL PASS/m, { S_API: 'badjson' });
 
 console.log('== checks.mjs (baseline, MODE=ci)');
 t('ci: all good', 0, /^ALL PASS$/m, /dnsLeak/, { MODE: 'ci' });
