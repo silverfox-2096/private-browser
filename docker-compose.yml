@@ -53,10 +53,12 @@ services:
       dockerfile: Dockerfile.firefox
     image: private-firefox:mozilla
     container_name: private-firefox
+    # Enforced on engine auto-restart too, before GUI/browser initialization.
+    entrypoint: ["/bin/sh", "/run/private-browser-startup.sh"]
     restart: unless-stopped
     depends_on:
       gluetun:
-        condition: service_healthy   # never starts before the tunnel is up
+        condition: service_healthy   # Compose readiness; startup-guard.sh also covers auto-restart
     network_mode: "service:gluetun"  # borrows Gluetun's netns; no network of its own
     security_opt:
       - no-new-privileges:true
@@ -103,6 +105,7 @@ services:
       - ./webauth-htpasswd:/config/webauth-htpasswd
       # Shared directory so the updater can atomically block new web sessions.
       - ./maintenance:/run/private-browser-maintenance:ro
+      - ./startup-guard.sh:/run/private-browser-startup.sh:ro
 
   # Optional self-hosted CreepJS fingerprint tester. Disabled by default.
   # Enable:  docker compose --profile test up -d creepjs

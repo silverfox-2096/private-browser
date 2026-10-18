@@ -9,6 +9,8 @@ services:
     image: private-firefox:ci
     container_name: pbfp-firefox
     network_mode: bridge
+    # This disposable measuring harness deliberately has no VPN.
+    entrypoint: ["/init"]
     depends_on: !reset {}
     restart: "no"
     environment:
