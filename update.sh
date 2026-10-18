@@ -16,7 +16,7 @@ die() { echo "FAILED: $1" >&2; echo "Not updated. Check: docker ps; docker logs 
 # --no-cache: Firefox is installed from Mozilla's APT repo in a RUN step, and the
 # layer cache would otherwise reuse that step and never pick up a new release.
 docker compose build --pull --no-cache firefox || die "image build"
-docker compose --profile test pull creepjs || die "pull of the creepjs test image"
+docker compose --profile test build --pull --no-cache creepjs || die "build of the creepjs test image"
 docker compose up -d || die "docker compose up"
 
 # One overall deadline per wait (SECONDS), including sleeps and request time.

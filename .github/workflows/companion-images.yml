@@ -1,0 +1,54 @@
+name: Companion image security
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "30 6 * * 1"
+permissions:
+  contents: read
+concurrency:
+  group: companion-images-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [gluetun, creepjs]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Read exact image pin from Compose
+        env:
+          SERVICE: ${{ matrix.service }}
+          WIREGUARD_PRIVATE_KEY: unused-in-scan
+          WIREGUARD_ADDRESSES: 10.2.0.2/32
+          GLUETUN_API_KEY: unused-in-scan
+        run: |
+          docker compose --profile test config --format json > compose-resolved.json
+          image=$(python3 -c 'import json,os; print(json.load(open("compose-resolved.json"))["services"][os.environ["SERVICE"]]["image"])')
+          if [ "$SERVICE" = creepjs ]; then
+            docker compose --profile test build --pull --no-cache creepjs
+          else
+            case "$image" in *@sha256:*) ;; *) echo 'Missing immutable image digest' >&2; exit 1 ;; esac
+          fi
+          echo "SCAN_IMAGE=$image" >> "$GITHUB_ENV"
+          printf '## %s\n\nImage: `%s`\n' "$SERVICE" "$image" >> "$GITHUB_STEP_SUMMARY"
+      - name: Gate on fixable HIGH and CRITICAL vulnerabilities
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.SCAN_IMAGE }}
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          format: json
+          output: companion-${{ matrix.service }}.json
+          exit-code: "1"
+      - name: Preserve scan evidence even when the gate fails
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: companion-${{ matrix.service }}
+          path: companion-${{ matrix.service }}.json
+          if-no-files-found: warn

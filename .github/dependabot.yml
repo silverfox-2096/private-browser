@@ -49,6 +49,7 @@ updates:
       - dependency-name: node
         update-types: ["version-update:semver-major"]
       # Built locally from Dockerfile.firefox; not on any registry.
+      - dependency-name: private-creepjs
       - dependency-name: private-firefox
       # Minor and major versions are bumped by hand, since they can rename
       # settings (README, "Gluetun pinned by digest"). Patch releases still come.
