@@ -16,6 +16,7 @@ services:
     volumes: !reset []
 
   creepjs:
+    image: private-creepjs:ci
     container_name: pbfp-creepjs
     network_mode: "service:firefox"  # the browser reaches it at localhost:8080, as in the real stack
     depends_on: !reset {}

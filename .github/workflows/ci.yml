@@ -49,7 +49,7 @@ jobs:
         run: |
           img=$(sed -n 's/^ *image: *\(hadolint\/.*\)/\1/p' ci/pins/compose.yml)
           docker run --rm -v "$PWD:/repo" -w /repo "${img:?no hadolint pin}" \
-            hadolint Dockerfile.firefox
+            hadolint Dockerfile.firefox Dockerfile.creepjs
 
   checkov:
     runs-on: ubuntu-latest
@@ -84,7 +84,9 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
       - name: Build the image Trivy will scan
-        run: docker build -f Dockerfile.firefox -t private-firefox:ci .
+        run: |
+          BUILDX_METADATA_PROVENANCE=max docker buildx build --load --metadata-file build-metadata.json -f Dockerfile.firefox -t private-firefox:ci .
+          python3 ci/build-inputs.py build-metadata.json
       - name: Trivy -- gate on FIXABLE High/Critical only
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25   # v0.36.0
         with:

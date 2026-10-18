@@ -101,7 +101,10 @@ services:
   # The container browser reaches it at http://localhost:8080 inside Gluetun's
   # namespace -- no host port publish is needed for that.
   creepjs:
-    image: nginx:alpine
+    build:
+      context: .
+      dockerfile: Dockerfile.creepjs
+    image: private-creepjs:patched
     container_name: creepjs-server
     profiles: ["test"]
     restart: unless-stopped

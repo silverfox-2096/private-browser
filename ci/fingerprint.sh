@@ -40,7 +40,7 @@ fi
 chmod -R a+rX ci/creepjs-docs   # nginx runs as its own user; a 077 umask hides the page
 
 echo "2/5 build (~3-5 min, quiet; errors still print) + start the browser (no VPN)"
-[ "${SKIP_BUILD:-0}" = 1 ] || dc build --quiet firefox
+[ "${SKIP_BUILD:-0}" = 1 ] || dc --profile test build --quiet firefox creepjs
 dc --profile test up -d firefox creepjs
 version=$(docker exec "$FF" firefox --version | sed -n 's/^Mozilla Firefox //p')
 echo "   Firefox ${version:?could not read the Firefox version}"

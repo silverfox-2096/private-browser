@@ -49,6 +49,7 @@ docker() {
       return 0 ;;
     compose)
       case "$*" in
+        *build*creepjs*) return "${S_PULL_RC:-0}" ;;
         *build*) return "${S_BUILD_RC:-0}" ;;
         *pull*) return "${S_PULL_RC:-0}" ;;
         *--wait*)   # verify restore; S_INT_RESTORE = Ctrl+C while it runs
@@ -185,7 +186,7 @@ echo "== update.sh"
 SCRIPT=update.sh ARGS=
 t "update: all good"                0 '^UPDATED'                   ''         $N
 t "update: build fails"             1 'FAILED: image build'        '^UPDATED' S_BUILD_RC=1
-t "update: creepjs pull fails"      1 'FAILED: pull'               '^UPDATED' S_PULL_RC=1
+t "update: creepjs build fails"      1 'FAILED: build of the creepjs'               '^UPDATED' S_PULL_RC=1
 t "update: compose up fails"        1 'FAILED: docker compose up'  '^UPDATED' S_UP_RC=1
 t "update: gluetun never healthy"   1 'not healthy after 90 s'     '^UPDATED' S_HEALTH=starting
 t "update: old image still running" 1 'not running the image just built' '^UPDATED' S_RUN_IMG=sha256:old

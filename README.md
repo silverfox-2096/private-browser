@@ -554,3 +554,27 @@ interchangeable.
 ## License
 
 MIT. See the `LICENSE` file. CreepJS is a separate project under its own license.
+
+
+### Companion image scans and build evidence
+
+The Companion image security workflow scans Gluetun's exact pinned digest and the
+locally built CreepJS nginx image on pushes, PRs and Mondays. Fixable HIGH/CRITICAL
+findings fail the job and its JSON report is preserved as an artifact. This is
+separate from the existing Firefox CI badge; check both workflows.
+
+The optional CreepJS server is built from a digest-pinned nginx Alpine image and
+applies `apk upgrade --no-cache`, so published Alpine fixes do not wait for nginx's
+next base-image rebuild. Dependabot tracks the Dockerfile pin. Run `update.sh` to
+rebuild it; a plain `compose pull` does not update a locally built image.
+
+Firefox's Trivy build also records the installed Firefox Debian package version,
+the output image digest and BuildKit's resolved base-image material digests in
+the job summary. These are build observations, not pins on Mozilla's moving APT
+repository.
+
+Known finding on 2026-10-18: the stable Gluetun v3.41.3 digest has 31 fixable
+HIGH/CRITICAL package findings in the local Trivy 0.70.0 scan (including repeated
+library findings across packages). Current upstream development still has five;
+we have not switched the stable VPN image to that development build. The expanded
+workflow intentionally exposes these findings rather than suppressing them.
