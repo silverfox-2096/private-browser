@@ -1,4 +1,16 @@
-# Sample `verify.sh` run
+# Verification and build evidence
+
+Build-only observation, 2026-10-18, public source `c101041` (before the maintenance-gate change): Firefox package `158.0~build2`. BuildKit resolved these linux/amd64 inputs:
+
+- jlesage/baseimage-gui:debian-13-v4.14.0: `sha256:887c603e603eb14f9dc18a0d8076b465a38504da0b57317c1fb402f3bc7ebd05`
+- jlesage/firefox:v26.09.1: `sha256:302aa068dcfa46a2d248771c998f67377383554df8940252caef42b99c13eb65`
+- debian:13-slim: `sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f`
+
+These are observed platform-manifest digests, not assertions about a newer build.
+The Firefox Trivy job now records equivalent evidence for each actual CI build in
+its summary. The historical runtime sample below remains dated September 24.
+
+## Sample `verify.sh` run
 
 Recorded 2026-09-24 on the author's machine, with the stack as published in this release (branch `review-4a1`, parent `f0336bc`). By default the script prints no IP address; run it with `SHOW_EXIT_IP=1` to see the exit address on a PASS.
 
