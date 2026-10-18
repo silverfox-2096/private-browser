@@ -24,3 +24,6 @@ verify.sh
 nginx-8080.conf
 ci/
 docker-compose.yml
+
+# Runtime gate state; only maintenance.conf belongs in the image
+maintenance/

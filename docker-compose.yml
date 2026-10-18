@@ -92,6 +92,8 @@ services:
     # read-only mount and restart-loops the container. The file holds only a bcrypt hash.
     volumes:
       - ./webauth-htpasswd:/config/webauth-htpasswd
+      # Shared directory so the updater can atomically block new web sessions.
+      - ./maintenance:/run/private-browser-maintenance:ro
 
   # Optional self-hosted CreepJS fingerprint tester. Disabled by default.
   # Enable:  docker compose --profile test up -d creepjs

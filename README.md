@@ -97,6 +97,22 @@ A web page open in the browser that requested `127.0.0.1:8000` first triggered
 Firefox's local-network permission prompt; after Block, nothing reached Gluetun
 (tested before the API key was added).
 
+### Maintenance window
+
+The image supports a maintenance flag at `maintenance/active`, mounted read-only
+into the container. While present, new web requests receive HTTP 503, including
+new VNC WebSocket connections. Existing WebSocket sessions stay connected, so a
+host updater can set the flag first, then detect an existing viewer and defer
+without wiping its session. The flag survives container recreation because the
+whole directory is mounted. `launch.sh` also refuses to start while it is present.
+The flag is used by the author's local updater; the repository's `update.sh`
+remains a manual, disruptive update command.
+
+A stale flag after a host crash leaves the web UI unavailable. Once no update is
+running, remove `maintenance/active` to recover. The author's updater removes stale
+flags only after acquiring its exclusive lock, and removes its flag on normal
+exit and handled interruptions.
+
 ## Continuous checks
 
 Every push, pull request, and a weekly schedule run a CI pipeline you can inspect
