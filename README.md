@@ -44,6 +44,16 @@ from outside the browser:
 - the CI scripts `ci/fingerprint.sh` and `ci/test-scripts.sh`;
 - the browser checks `ci/checks.mjs` and their test, `ci/test-checks.mjs`.
 
+The browser exit check validates IP, country and ASN metadata, checks HTTP status,
+and bounds requests to eight seconds. Missing evidence gets at most three attempts,
+with each diagnosis retained in `checks-out.json`; persistent unavailability is
+INCOMPLETE (exit 3). Wrong-country observations and inconsistent addresses still
+FAIL. WebRTC retains its observed candidates but is INCOMPLETE without a validated
+exit-IP reference. DNS API requests also have an eight-second deadline; a prohibited
+resolver identity still FAILs. The local updater treats FAIL and INCOMPLETE as
+unsuccessful validation and rolls back. These checks establish resolver identity;
+packet captures are needed to establish the network path.
+
 Some of it parses untrusted input: `verify.sh` reads JSON from ipinfo.io, and
 `checks.mjs` reads JSON from ipinfo.io and bash.ws.
 
