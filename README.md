@@ -580,12 +580,13 @@ we have not switched the stable VPN image to that development build. The expande
 workflow intentionally exposes these findings rather than suppressing them.
 
 
-### Gluetun security candidate (2026-10-18; opt-in, awaiting deployment approval)
+### Gluetun security remediation (2026-10-18; local custom build)
 
 The default stable v3.41.3 image still has 31 HIGH package findings in the current
 scan. A separate build from that exact stable source fixes all 31 by updating
 Alpine packages, Go and dependencies. It passed upstream race tests and isolated
-VPN/browser/firewall checks; it has not replaced the live VPN or the default pin.
+VPN/browser/firewall checks. The approved local rollout passed network checks
+4/4 and browser checks 7/7; the public default pin remains upstream stable.
 See [the candidate build and maintenance record](gluetun-patched/README.md).
-The stable-image CI gate remains active and failing until an approved deployment
-changes that baseline. No vulnerability exclusions were introduced.
+The public stable-image CI gate remains active and failing until its default
+baseline is deliberately changed; the local rollout does not change public main. No vulnerability exclusions were introduced.

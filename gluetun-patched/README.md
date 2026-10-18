@@ -1,9 +1,11 @@
 # Patched stable Gluetun candidate — 2026-10-18
 
-**Ready for operator review; not deployed.** The default Compose pin and live VPN
-remain upstream v3.41.3. No CVE suppression was added. The stable companion scan
-therefore remains a failing security signal. The new candidate CI job and
-Dependabot coverage are prepared on the review branch, not yet running on main.
+**Deployed locally with operator approval on 2026-10-18.** The live VPN uses the
+immutable custom image below through an automatic Compose override. Live network
+checks passed 4/4, browser checks 7/7, and control API authentication passed.
+The default public Compose pin remains upstream stable; its failing companion
+scan remains visible. The build and CI changes are committed on the local review
+branch, not pushed or merged. No vulnerability exclusions were added.
 
 ## Identities and changes
 
@@ -18,7 +20,7 @@ Dependabot coverage are prepared on the review branch, not yet running on main.
   `sha256:945d325be5c2abe50b89c84791b51a4e3d039737ed3703b2482c1e2b396e8fbe`;
   the recorded development comparison has five HIGH findings and was not adopted.
 - Candidate local tag: `private-gluetun:v3.41.3-pb1`.
-  Tested immutable image/index ID:
+  Tested and deployed immutable image/index ID:
   `sha256:e8e565d3ca963f40239a7b0878681299ef0dc4ec5bfc5deca94402b554a25c06`.
   It is a local custom build, not an upstream release or a published registry image.
 - Go 1.27.2; x/net v0.60.0; x/crypto v0.57.0; x/text v0.42.0;
@@ -107,8 +109,8 @@ changes are prepared, not a guarantee of timely fixes. Every replacement needs
 its own scan, upstream tests and isolated VPN/browser/firewall validation. Prefer
 returning to a maintained upstream stable fix when available.
 
-Production rollout requires explicit approval of this custom build and a closed
-viewer. Use the existing updater exclusive lock, create/verify the maintenance
+Production rollout was explicitly approved and the operator confirmed a closed
+viewer. Future replacements require the same review and closure precautions. Use the existing updater exclusive lock, create/verify the maintenance
 503 gate BEFORE reading viewer sockets, and abort if any remain or checks fail.
 Keep the gate through rollout and rollback; release it on exit. Do not run the
 candidate and original VPN concurrently with the same WireGuard key. Do not remove
@@ -119,8 +121,7 @@ an overlay passed only with `-f` would be lost by those callers. The repository'
 `docker-compose.gluetun-candidate.yml` is a separate opt-in template for review,
 not an automatically active file. `pull_policy: never` prevents a registry lookup.
 Confirm the running image ID, health, authenticated API, verify.sh and browser
-checks after the swap. The local rollout script is staged in task evidence and
-has not been executed. Default public compose remains upstream stable pending
+checks after the swap. The local rollout script completed successfully; its logs are retained in task evidence. Default public compose remains upstream stable pending
 an explicit distribution/default-pin decision; this local image is not on a registry.
 
 Rollback: under the same lock/gate, stop candidate VPN/browser, remove only the automatic override created by this rollout and run the original Compose definition, then restart Firefox so it joins
@@ -141,3 +142,25 @@ verify its SHA256 before loading if Docker's local images have been removed.
 - [Alpine 3.22 security database](https://secdb.alpinelinux.org/v3.22/main.json)
 - [Retained UNKNOWN advisory](https://pkg.go.dev/vuln/GO-2026-5932)
 - [Remaining module-only s2 advisory](https://pkg.go.dev/vuln/GO-2026-5841)
+
+## Local deployment result
+
+Rollout started 2026-10-18 13:33:11 UTC (19:03:11 IST), after explicit approval and
+renewed browser-closed confirmation. The automatic `docker-compose.override.yml`
+contains the exact local image ID and `pull_policy: never`. Existing updater,
+launcher and verify commands therefore retain this image. The upstream base
+Compose file remains unchanged; the override is part of the live configuration
+and must be preserved with backups. Both current image identity and shared
+network identity were checked after verify.sh's stop/restore cycle. All 4 live
+network checks, 7 browser checks and authenticated/unauthenticated API checks
+passed. VPN healthy, browser running, shared backend/network preserved, gate
+released. No rollback was required during production deployment.
+
+To roll back this specific rollout, hold the updater lock, gate new requests,
+confirm no viewer remains, stop the browser/optional test server/VPN, then remove
+only this deployment's `docker-compose.override.yml`. Bring up the original
+Compose stack and reattach Firefox, then run verify.sh and browser checks before
+releasing the gate. Never run both VPN images with the same WireGuard credentials.
+The original image remains archived and was successfully restored/tested twice
+before deployment. It retains the 31-HIGH baseline, so rollback reintroduces those
+package findings. No other system or network recreation is needed.
