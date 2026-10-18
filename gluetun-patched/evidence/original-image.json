@@ -1,0 +1,34 @@
+{
+  "Id": "sha256:fa19cc76b2af13d57a8d3dc3066f2ada061b1c761b8aecf989b3877c0486e027",
+  "RepoDigests": [
+    "qmcgaw/gluetun@sha256:fa19cc76b2af13d57a8d3dc3066f2ada061b1c761b8aecf989b3877c0486e027"
+  ],
+  "Architecture": "amd64",
+  "Os": "linux",
+  "Created": "2026-07-30T14:56:14.867228668Z",
+  "Labels": {
+    "org.opencontainers.image.authors": "quentin.mcgaw@gmail.com",
+    "org.opencontainers.image.created": "2026-07-30T14:53:40.495Z",
+    "org.opencontainers.image.description": "VPN client in a thin Docker container for multiple VPN providers, written in Go, and using OpenVPN or Wireguard, DNS over TLS, with a few proxy servers built-in.",
+    "org.opencontainers.image.documentation": "https://github.com/qdm12/gluetun",
+    "org.opencontainers.image.licenses": "MIT",
+    "org.opencontainers.image.revision": "3d1e20c5551e9cae1f9d938dc7b7214a6987f27e",
+    "org.opencontainers.image.source": "https://github.com/passteque/gluetun",
+    "org.opencontainers.image.title": "gluetun",
+    "org.opencontainers.image.url": "https://github.com/passteque/gluetun",
+    "org.opencontainers.image.version": "v3.41.3"
+  },
+  "Entrypoint": [
+    "/gluetun-entrypoint"
+  ],
+  "Healthcheck": {
+    "Test": [
+      "CMD-SHELL",
+      "/gluetun-entrypoint healthcheck"
+    ],
+    "Interval": 5000000000,
+    "Timeout": 5000000000,
+    "StartPeriod": 10000000000,
+    "Retries": 3
+  }
+}

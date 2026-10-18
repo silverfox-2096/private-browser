@@ -21,7 +21,7 @@ updates:
   # Dockerfile.firefox: jlesage/firefox (glue scripts) and jlesage/baseimage-gui
   # move together, so they share one PR.
   - package-ecosystem: docker
-    directory: /
+    directories: ["/", "/gluetun-patched"]
     schedule:
       interval: weekly
       day: monday
@@ -67,3 +67,12 @@ updates:
       time: "04:00"
     cooldown:
       default-days: 7
+
+  # The opt-in stable-source VPN build is our maintenance responsibility.
+  # Updates require review, an image scan and isolated VPN/browser checks.
+  - package-ecosystem: gomod
+    directory: /gluetun-patched
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:00"

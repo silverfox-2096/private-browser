@@ -578,3 +578,14 @@ HIGH/CRITICAL package findings in the local Trivy 0.70.0 scan (including repeate
 library findings across packages). Current upstream development still has five;
 we have not switched the stable VPN image to that development build. The expanded
 workflow intentionally exposes these findings rather than suppressing them.
+
+
+### Gluetun security candidate (2026-10-18; opt-in, awaiting deployment approval)
+
+The default stable v3.41.3 image still has 31 HIGH package findings in the current
+scan. A separate build from that exact stable source fixes all 31 by updating
+Alpine packages, Go and dependencies. It passed upstream race tests and isolated
+VPN/browser/firewall checks; it has not replaced the live VPN or the default pin.
+See [the candidate build and maintenance record](gluetun-patched/README.md).
+The stable-image CI gate remains active and failing until an approved deployment
+changes that baseline. No vulnerability exclusions were introduced.
