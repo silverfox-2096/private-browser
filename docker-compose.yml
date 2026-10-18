@@ -18,6 +18,11 @@ services:
       - NET_ADMIN
     devices:
       - /dev/net/tun:/dev/net/tun
+    # Keep Docker DNS upstream sockets in this namespace, behind the VPN firewall.
+    # Inheriting a host loopback resolver lets dockerd forward outside the tunnel.
+    dns:
+      - 1.1.1.1
+      - 1.0.0.1
     environment:
       VPN_SERVICE_PROVIDER: protonvpn   # any Gluetun-supported provider works
       VPN_TYPE: wireguard
