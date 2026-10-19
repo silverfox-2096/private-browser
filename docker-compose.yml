@@ -46,6 +46,8 @@ services:
       - "127.0.0.1:7814:5800"   # VNC web UI (localhost only)
     volumes:
       - ./gluetun:/gluetun
+      # Block browser-initiated connections to host/LAN/other Docker apps.
+      - ./local-app-post-rules.txt:/iptables/post-rules.txt:ro
 
   firefox:
     build:
