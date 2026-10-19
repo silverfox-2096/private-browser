@@ -77,6 +77,66 @@ negative packet-egress test. The completed old collector must not be rerun.
 Separate authorization and the operational prerequisites in
 [FOLLOW-UP-PLAN.md](FOLLOW-UP-PLAN.md) remain required.
 
+## Additional exposed-host review — 19 October 2026
+
+A second bounded pass reviewed the remaining wildcard host listeners and selected
+installed web-application source/media API metadata. It did not establish a usable
+anonymous caller-selected forwarding operation. It does not close issue #32.
+
+| Surface and operation | Evidence | Limit |
+|---|---|---|
+| Host web server root | Two GET attempts from the VPN namespace timed out; a separate host-local GET returned 200 | No successful browser-namespace HTTP transaction; cause of the timeouts and alternate destinations were not established |
+| Host frontend proxy | Health GET returned 200; protected backend configuration GET returned 401; inspected proxy destinations are fixed | Confirms this proxy path preserves the observed rejection, not that all backend routes are safe |
+| Host media server | Health GET returned 200; installed API schema and XML documentation inspected | API metadata is supporting evidence, not a source audit of the running binary |
+| Two media remote-image GET routes, using an all-zero synthetic item ID | Each returned 401 | No actual remote-image request executed |
+| Media URL-based image download | Installed schema declares POST plus elevated authenticated access | Not invoked: it is an authenticated, state-changing operation |
+| Synthetic audio/video stream GETs, no credentials and no external destination | Each returned 400 | Validation errors do not prove authorization rejection; playback helper behavior remains unresolved |
+| Historical remote-image route without a URL argument | Returned 404 and absent from the current installed schema | Does not test other image/streaming routes or historical vulnerabilities |
+
+The installed media server reports version 12.2.0; its own OpenAPI document has
+364 declared operations. Candidate selection inspected 239 signatures mentioning
+images, URLs, paths, streams, remote resources or related operations. Forty selected
+operations omit a security declaration, including playback/image routes. Omission
+is not evidence that they allow anonymous forwarding, and declared security is not
+proof of runtime enforcement. No real media identifiers, media content, user list,
+API keys or session tokens were requested. Query/body semantics, plugins and all
+request-path helpers were not exhaustively audited.
+
+Selected installed host web-application source shows gallery uploads and webhook
+configuration requiring content/settings permissions, with webhook dispatch making
+server requests to configured destinations. The application access middleware also
+permits guest access when public mode is enabled; this review did not read runtime
+settings or assume public mode is disabled. Exports have visibility/export-permission
+checks; the reviewed contained-HTML image conversion attempts application storage
+rather than fetching arbitrary external images. PDF engines, externally fetched
+avatars and other downstream request paths remain outside the completed checks.
+No exports, webhook changes, uploads, login flow or application configuration changes
+were executed.
+
+The enabled web-server virtual-host configuration was unreadable with ordinary
+access, and a noninteractive read attempt required unavailable sudo authentication.
+It remains unread, with no password requested or access workaround attempted.
+Readable module/include directives alone do not establish the full virtual-host
+policy. An initial media-schema path returned 404; the installed schema was obtained
+at its current OpenAPI path. Upstream source-tag lookups were unavailable and were
+not substituted for evidence about the installed binary.
+
+Thirteen anonymous GET attempts in total used unique identifiers and an unprivileged
+temporary client in the existing VPN namespace. Responses were reduced to statuses,
+redirect paths and bounded error types; bodies were not retained. The two web-server
+timeouts remain unsuccessful observations. Known peer/media health routes supplied
+reachability controls, and tunnel/local readiness succeeded before and after each
+sequence. No arbitrary-port sweep, supplied external destination, real forwarding
+transaction, packet capture, IPv6 visibility control or per-socket attribution ran.
+Therefore no negative packet-egress or IPv6-regeneration result is claimed.
+
+Before/after checks again verified unchanged live container IDs/start times, images,
+Compose/override/guard hashes, shared bridge identity/membership, explicit DNS and
+healthy VPN/backend. The optional server stayed absent, maintenance stayed inactive
+and both temporary clients were removed. No browser restart or reboot occurred.
+The next useful step is a narrowly scoped implementation review of a specific
+unresolved request-generating route, before choosing any controlled transaction.
+
 ## Preservation and evidence
 
 Verified unchanged live container IDs/start times, immutable images, Compose and
