@@ -18,7 +18,8 @@ RUN apk add --no-cache build-base
 COPY tests/configfile-diagnostics.patch /tmp/configfile-diagnostics.patch
 COPY tests/auth_contract_test.go internal/server/middlewares/auth/pb_contract_test.go
 # Only test diagnostics change. Pin the original test to fail on source drift.
-RUN echo "bb1e76ed06d4b8b92467595ec18c2c85f37f8df31e55ec4c1583e40dbecc76d6  internal/server/middlewares/auth/configfile_test.go" | sha256sum -c - \
+RUN printf '%s\n' "bb1e76ed06d4b8b92467595ec18c2c85f37f8df31e55ec4c1583e40dbecc76d6  internal/server/middlewares/auth/configfile_test.go" > /tmp/upstream-test.sha256 \
+    && sha256sum -c /tmp/upstream-test.sha256 \
     && patch -p1 -F 0 < /tmp/configfile-diagnostics.patch \
     && CGO_ENABLED=1 go test -race -count=1 ./...
 

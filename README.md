@@ -17,10 +17,13 @@ the VPN and kill switch and jlesage's [GUI base image](https://github.com/jlesag
 for a VNC web UI, with Firefox installed from Mozilla's own APT repository and
 hardened with Firefox's own `resistFingerprinting`.
 
-> Docs & config verified: 2026-09-26 (Firefox 156, Gluetun v3.41.3).
-> Runtime & leak-tested: 2026-09-26, on one host; what was and was not tested is
-> under [What has been tested](#what-has-been-tested). This is a security tool; if
-> either date looks old, treat it as unverified.
+> Latest follow-up validation: 2026-10-19. The deployed startup/DNS/checker fixes
+> and restored live stack passed their scoped checks; published dependency updates
+> do not replace the maintainer's pinned live VPN image. See the [changelog](#changelog).
+> Baseline runtime/leak review: 2026-09-26, on one host (Firefox156, Gluetunv3.41.3);
+> older test matrices retain their own dates. Coverage and remaining boot/relay
+> limits are under [What has been tested](#what-has-been-tested). This is not an
+> independent security audit.
 
 ## What this is, and what it isn't
 
