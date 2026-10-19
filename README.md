@@ -1,6 +1,7 @@
 # Private Browser (VPN-tunneled, fingerprint-hardened)
 
 ![CI](https://github.com/silverfox-2096/private-browser/actions/workflows/ci.yml/badge.svg)
+[![Companion scans](https://github.com/silverfox-2096/private-browser/actions/workflows/companion-images.yml/badge.svg)](https://github.com/silverfox-2096/private-browser/actions/workflows/companion-images.yml)
 ![License](https://img.shields.io/github/license/silverfox-2096/private-browser)
 ![Last commit](https://img.shields.io/github/last-commit/silverfox-2096/private-browser)
 
@@ -489,6 +490,9 @@ Firefox's local-network permission prompt; after Block, nothing reached Gluetun
 
 ## Continuous checks
 
+[Security results and private reporting](SECURITY.md) explains dashboard access,
+full findings versus green gates, and where companion reports live.
+
 <details>
 <summary>CI jobs, update reports and what a green badge means</summary>
 
@@ -806,6 +810,7 @@ Latest: documentation navigation and the reviewed October security/maintenance f
 <details>
 <summary>Release and maintenance history — latest 19 October 2026</summary>
 
+- 2026-10-19: Added a public security policy/result guide and companion-scan badge. Verified that Firefox SARIF uploads are present; alert details require suitable signed-in access. Found dependency alerts/security-fix proposals disabled and enabled them, along with private vulnerability reporting. Full findings remain visible to authorized users; green CI only gates fixable HIGH/CRITICAL findings. No finding was dismissed and no running image changed.
 - 2026-10-19: Reordered this README around setup, daily use and verification; moved long evidence, design notes and history into expandable sections. Added a scoped [follow-up plan](FOLLOW-UP-PLAN.md) for remaining boot/relay coverage. No runtime configuration changed.
 - 2026-10-19: Resolved the held TOML2.4.3 update after reviewing its two changed diagnostics. The test stage now checks the original upstream test file's checksum and updates only those exact message expectations, retaining every case and assertion. Added parser/authorization contract tests pass with both library versions and detect deliberately removed protections. The full upstream race suite, candidate build and scan pass. Application authentication code and the pinned live VPN image are unchanged; this is published build maintenance, not a live deployment ([PR #21](https://github.com/silverfox-2096/private-browser/pull/21)).
 - 2026-10-19: Added a browser startup guard that waits for the VPN interface and local health endpoint before GUI initialization, including Docker engine restarts. Missing readiness blocks startup; the guard ignores proxies and refuses redirects. Deployed on the maintainer's host without changing either running image. Isolated readiness tests, controlled packet observations and restored live network (4/4) and browser (7/7) checks passed. This does not establish every actual host-boot timing state or arbitrary host/IPv6 relay safety. See [Browser startup readiness](#browser-startup-readiness) ([PR #26](https://github.com/silverfox-2096/private-browser/pull/26)).
