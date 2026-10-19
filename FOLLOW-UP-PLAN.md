@@ -14,6 +14,17 @@ remains pinned. No new bypass is established by the open items below.
 |3|Would independent process/socket attribution resolve an uncertain forwarding result?|For a specific transaction, inspect the available process/cgroup/socket information and use existing tracing access if available.|Tie the regenerated socket to the service/process and the test transaction. A cgroup name or unrelated socket listing is insufficient. Retain denied/disappeared-process observations as incomplete.|
 |4|Does the guarded browser start safely during actual laptop boot?|First review the remaining timing claim against the isolated startup-guard evidence. If actual boot coverage is still needed, prepare a separate experiment with collection ready before Docker starts.|A common clock for container/process creation, firewall/readiness/tunnel transitions and identifiable executed operations during a tunnel-absent window, with namespace/physical observations, positive controls and loss counts. All-tunnel-present probes do not close this gap.|
 
+## Current work record
+
+The [19 October local forwarding review](FOLLOW-UP-RESULTS.md) records the refreshed
+inventory, installed request-path review and seven anonymous configuration-route
+rejections with reachability controls. It did not execute a forwarding transaction;
+wider relay/IPv6/attribution coverage remains INCOMPLETE in
+[issue #32](https://github.com/silverfox-2096/private-browser/issues/32).
+The separately authorized boot design is tracked in
+[issue #33](https://github.com/silverfox-2096/private-browser/issues/33); no reboot is
+scheduled. These records do not close the evidence requirements below.
+
 ## First work package: local forwarding review
 
 Start with read-only, sanitized inspection of the current host and shared bridge.

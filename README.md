@@ -257,6 +257,12 @@ and approval boundaries. No reboot or repeat of the completed collector is reque
 
 ## What has been tested
 
+The [19 October local forwarding review](FOLLOW-UP-RESULTS.md) refreshed the current
+service inventory and installed peer request paths. Seven anonymous configuration
+GETs returned 401, with public-route reachability controls. No forwarding transaction
+ran; wider relay/IPv6 coverage remains [open](https://github.com/silverfox-2096/private-browser/issues/32).
+
+
 **Coverage is limited to the recorded hosts, targets and states.** Actual
 host-boot tunnel-absent timing, arbitrary host/bridge forwarding, IPv6 regeneration
 and independent regenerated-socket attribution remain unverified. Local Docker
@@ -810,6 +816,7 @@ Latest: documentation navigation and the reviewed October security/maintenance f
 <details>
 <summary>Release and maintenance history — latest 19 October 2026</summary>
 
+- 2026-10-19: Enforced PRs and all eight app-bound CI/companion checks on up-to-date branches for main, including administrators; blocked force pushes/deletion without requiring a second reviewer. Enabled Issues with minimal bug/task templates and private-report routing. Refreshed the bounded [local forwarding review](FOLLOW-UP-RESULTS.md); seven anonymous configuration requests were rejected, while forwarding/IPv6 and actual host-boot gaps remain open. No live service/image/configuration changed.
 - 2026-10-19: Added a public security policy/result guide and companion-scan badge. Verified that Firefox SARIF uploads are present; alert details require suitable signed-in access. Found dependency alerts/security-fix proposals disabled and enabled them, along with private vulnerability reporting. Full findings remain visible to authorized users; green CI only gates fixable HIGH/CRITICAL findings. No finding was dismissed and no running image changed.
 - 2026-10-19: Reordered this README around setup, daily use and verification; moved long evidence, design notes and history into expandable sections. Added a scoped [follow-up plan](FOLLOW-UP-PLAN.md) for remaining boot/relay coverage. No runtime configuration changed.
 - 2026-10-19: Resolved the held TOML2.4.3 update after reviewing its two changed diagnostics. The test stage now checks the original upstream test file's checksum and updates only those exact message expectations, retaining every case and assertion. Added parser/authorization contract tests pass with both library versions and detect deliberately removed protections. The full upstream race suite, candidate build and scan pass. Application authentication code and the pinned live VPN image are unchanged; this is published build maintenance, not a live deployment ([PR #21](https://github.com/silverfox-2096/private-browser/pull/21)).
