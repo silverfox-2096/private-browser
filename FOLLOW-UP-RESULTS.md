@@ -1,5 +1,87 @@
 # Local forwarding review — 19 October 2026
 
+## Completed assessment and containment
+
+The configuration-specific review is complete. A reachable local application's
+normal authenticated fetch functionality can originate requested traffic through
+its own network, outside the browser's VPN. No anonymous arbitrary-destination
+relay was established in the reviewed live paths. The operator chose to prevent
+this delegation as well: the deployed [local-app policy](LOCAL-APP-POLICY.md) now
+blocks browser-initiated private/local destinations, including the previously
+reachable host/bridge applications. Public internet services reached at public
+addresses remain accessible through the VPN; this is not universal relay prevention.
+
+### Transaction and attribution
+
+The selected operation was the installed peer's Proxmox connection-test route,
+which accepts a target and fetches version/permission endpoints. Valid-shaped live
+POSTs without credentials, with an invalid bearer, and with an invalid service key
+returned401; an anonymous request through the frontend also returned401.
+
+A disposable instance used the installed runtime dependencies and unchanged public
+source matching65 deployed files, its normal authentication dependency and a synthetic
+signed user token. It had separate disposable data/signing material, no production
+environment/data mounts, no disabled authentication and verified TLS with a lab-only
+CA. Authorized requests from UID1000 in the actual VPN namespace completed both
+expected GETs against controlled IPv4 and IPv6 loopback fixtures. An anonymous
+comparison returned401. No production account or authenticated production fetch
+was used; this was installed-code capability exercised in an isolated instance.
+
+A further authorized request selected a public HTTPS target. Its connection timed
+out, so completed external HTTPS delivery remains INCOMPLETE. Nevertheless, the
+app's own descriptor/socket record tied the selected SYN to its process and peer
+namespace. Matching source-port/sequence observations followed it through host NAT
+to physical Wi-Fi, outside Gluetun; it was absent from the VPN namespace capture.
+Three narrow captures recorded879 observations, including duplicate boundary
+observations, with zero reported kernel drops. The successful IPv6 control was
+loopback only; the actual peer/media containers had no usable public IPv6 route.
+This does not establish public IPv6 delivery or exhaustive application safety.
+
+Installed media helper review and synthetic probes did not establish an anonymous
+URL-only relay. Aggregate read-only media checks found no indexed HTTP/RTSP paths
+or .strm entries and no installed plugin directories/located live-TV configuration
+in the searched tree; these are bounded applicability checks. Host web-server
+attempts failed before HTTP, with host/default-bridge availability controls and
+firewall evidence. Runtime virtual-host/application settings remained unread.
+No actual media content/identifiers or another app's credentials were retrieved.
+
+### Deployed restriction and recovery
+
+The mounted rules reject original-direction private/local destinations before
+Gluetun's general established/bridge allows. Isolated IPv4/IPv6 fixtures worked
+before insertion and were blocked after; incoming replies and loopback still
+worked. A valid request on an already-connected outgoing TCP session was blocked,
+with a matching REJECT counter increase; the client timed out, rather than reporting
+a synchronous refusal.
+
+Three live host/peer destinations connected before deployment and were blocked
+afterward, with the tunnel absent, after API tunnel restart and after full VPN
+container restart. Host controls still reached all three. Real browser-container
+UID1000 HTTPS/DNS and viewer/API authentication passed; all seven browser checks
+passed. No fresh packet capture or full verify.sh4/4 rerun is claimed for this
+hardening; kernel rules/counters and before/after operation controls establish this
+specific access restriction.
+
+Fresh closure confirmation, updater lock, verified maintenance503 and readable
+zero-viewer socket checks preceded both attempts. A final harness assertion first
+expected401 from the viewer, whose actual behavior is302 to login; automatic
+rollback recovered the previous configuration. The corrected retry verified the
+login destination and authentication configuration and passed. Maintenance gate
+released; VPN healthy; optional test service removed. Pinned images/override,
+explicit DNS, startup guard, shared network and unrelated app identities preserved.
+No network deletion, concurrent second VPN, unrelated service restart or reboot.
+
+[Issue #32](https://github.com/silverfox-2096/private-browser/issues/32) records this
+configuration-specific closeout. Actual host-boot timing remains separately tracked
+in [issue #33](https://github.com/silverfox-2096/private-browser/issues/33).
+
+## Historical bounded passes
+
+The following dated reports preceded the completed assessment and deployed policy
+above. Their references to open relay work and permitted bridge access describe
+the earlier state, retained as evidence history.
+
+
 ## Result and scope
 
 The current read-only review did not establish an applicable anonymous forwarding

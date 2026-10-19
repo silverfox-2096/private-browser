@@ -18,11 +18,12 @@ the VPN and kill switch and jlesage's [GUI base image](https://github.com/jlesag
 for a VNC web UI, with Firefox installed from Mozilla's own APT repository and
 hardened with Firefox's own `resistFingerprinting`.
 
-> Latest follow-up validation: 2026-10-19. The deployed startup/DNS/checker fixes
-> and restored live stack passed their scoped checks; published dependency updates
+> Latest follow-up validation: 2026-10-19. Local-app delegation is now blocked at
+> private/local addresses; VPN recovery and browser checks7/7 passed. The deployed
+> startup/DNS/checker fixes also passed their scoped checks; published dependency updates
 > do not replace the maintainer's pinned live VPN image. See the [changelog](#changelog).
 > Baseline runtime/leak review: 2026-09-26, on one host (Firefox 156, Gluetun v3.41.3);
-> older test matrices retain their own dates. Coverage and remaining boot/relay
+> older test matrices retain their own dates. Coverage and remaining boot/remote-relay
 > limits are under [What has been tested](#what-has-been-tested). This is not an
 > independent security audit.
 
@@ -273,8 +274,8 @@ These results come from one host, running the versions recorded for each test. T
 test scripts were written with Claude Code and run by me; they are not an independent
 test.
 
-**Network boundary** (2026-09-24, connection attempts from inside the browser's
-namespace):
+**Historical network boundary** (2026-09-24, before the local-app policy;
+connection attempts from inside the browser's namespace):
 
 - Reached: another container on the same Docker network, and the host's own address
   on that network. Through that address the browser reaches any host port that
@@ -283,9 +284,9 @@ namespace):
   Which ports answer depends on your host's firewall and Docker's rules.
 - Not reached: the one LAN address and the one address on another private network
   of the host that were tried. The namespace routes them into the tunnel.
-- The stack does not block the Docker-network path. If the browser must not reach a
-  service on your host, restrict it on the host side, for example by binding it (or
-  publishing it) on `127.0.0.1` only.
+- At that time the stack did not block the Docker-network path. The 19 October
+  [local-app policy](LOCAL-APP-POLICY.md) now blocks original-direction connections
+  to private/local addresses; the historical observations above describe the old policy.
 
 **Leaks while the tunnel changes state** (2026-09-26): a packet capture on all of the
 host's interfaces during four events, while a probe inside the browser container,
@@ -371,7 +372,9 @@ a wget process inside the browser container, reproduced the host path through th
 default resolver. Tested fully qualified public-name requests used Gluetun's DoT
 path. Explicit Docker-DNS queries use
 plaintext DNS within the VPN, while Gluetun public-name resolution uses DNS over TLS.
-This setting does not isolate services reachable on the shared Docker network.
+Explicit DNS alone does not isolate services on the shared Docker network. The
+separate [local-app policy](LOCAL-APP-POLICY.md) now blocks outgoing connections
+to those private/local addresses while preserving replies to incoming viewer traffic.
 
 If Gluetun's container restarts (after a crash or a `docker restart`, for example),
 Firefox is left in the old, dead namespace and reaches nothing until it is restarted
@@ -635,7 +638,8 @@ Changing any of these without reading can break the stack or weaken it. You will
 | Setting | Why it is set this way |
 |---|---|
 | `BLOCK_MALICIOUS: "off"` | Turning it on can push Gluetun's DNS resolver into a restart loop on some providers, so DNS stops resolving. Your provider's own malware blocking already covers this. |
-| `FIREWALL_OUTBOUND_SUBNETS: ""` | Adds no LAN exceptions to Gluetun's firewall, so LAN addresses go into the tunnel or nowhere. It does not remove Gluetun's built-in exception for the Docker network the container sits on; see [What has been tested](#what-has-been-tested). |
+| `FIREWALL_OUTBOUND_SUBNETS: ""` | Adds no LAN exceptions. Gluetun still has a built-in connected-Docker-network allowance; the separately mounted local-app rules override that outgoing path. |
+| `local-app-post-rules.txt:/iptables/post-rules.txt:ro` | Rejects browser-initiated connections to private/local destinations before general established/bridge accepts, including existing outgoing sessions. Preserves loopback and incoming viewer/API replies. Keep this file and mount when updating; see [policy and limits](LOCAL-APP-POLICY.md). |
 | Ports on `gluetun`, `127.0.0.1:` prefix | They have to live on Gluetun (shared namespace). The `127.0.0.1:` prefix keeps the published port off your LAN; containers on the same Docker network can still reach the namespace's ports directly. |
 | `SECURE_CONNECTION: 1` and `WEB_AUTHENTICATION: 1` | TLS plus an HTTPS login page for the web UI. Credentials are a bcrypt hash in a host-mounted `webauth-htpasswd` file, so they are not plaintext and not readable via `docker inspect`. This replaces the older `VNC_PASSWORD` (capped at 8 characters, exposed via `docker inspect`). The file is mounted read-write because the image's init sets its permissions at startup; note this is the one host file the browser container can write, so a compromised container could rewrite the hash (worst case: lock you out, or persist its own login to the loopback UI) — a minor channel an attacker already inside the container gains little from. |
 | `HTTP_CONTROL_SERVER_AUTH_DEFAULT_ROLE` (API key from `.env`) | Gluetun's control server listens on `:8000` inside the container, reachable from the browser's own namespace and from any container on the compose network. By default v3.41 answers some routes without credentials: in testing the VPN status route did, and per Gluetun's source so does the route that stops the VPN. This role puts every route behind the key (per the source; tested: without the key, reading the status, version and settings, and a request to change the VPN status, all get 401). Nothing in this stack calls the API. Like the WireGuard key, the value is visible to anyone who can run `docker inspect`. |
@@ -809,11 +813,13 @@ interchangeable.
 
 ## Changelog
 
-Latest: documentation navigation and the reviewed October security/maintenance follow-ups. Expand for dated changes.
+Latest: deployed local-app access restriction and completed configuration-specific relay review. Expand for dated changes.
 
 <details>
 <summary>Release and maintenance history — latest 19 October 2026</summary>
 
+- 2026-10-19: Blocked browser-initiated connections to host/LAN/Docker apps at private/local addresses using Gluetun's read-only [post-firewall rules](local-app-post-rules.txt). This prevents the reviewed local-app delegation path, including authenticated fetch features. Deployed after browser closure: isolated IPv4/IPv6 controls, live before/after local-app controls, tunnel-down denial and tunnel/container restart persistence passed; public HTTPS/DNS, viewer/API authentication and browser checks7/7 passed. The pinned images/override, explicit DNS, startup guard and shared network remain unchanged. Local apps intentionally stop opening inside Private Browser; publicly addressed internet services remain accessible through the VPN. A mistaken final viewer-status assertion rolled back safely before the corrected retry passed. See [policy and validation](LOCAL-APP-POLICY.md).
+- 2026-10-19: Completed the [configuration-specific relay assessment](FOLLOW-UP-RESULTS.md#completed-assessment-and-containment). An isolated instance of unchanged deployed application code, with normal authentication/TLS and no production credentials, completed controlled IPv4/IPv6 loopback fetches; its requested external SYN was attributed to its process/socket and host physical egress outside Gluetun. External HTTPS completion timed out. No anonymous arbitrary-destination relay was established in the reviewed live paths. These bounded results supersede the earlier open-ended relay work; actual host-boot timing remains separate.
 - 2026-10-19: Enforced PRs and all eight app-bound CI/companion checks on up-to-date branches for main, including administrators; blocked force pushes/deletion without requiring a second reviewer. Enabled Issues with minimal bug/task templates and private-report routing. Refreshed the bounded [local forwarding review](FOLLOW-UP-RESULTS.md); seven anonymous configuration requests were rejected, while forwarding/IPv6 and actual host-boot gaps remain open. No live service/image/configuration changed.
 - 2026-10-19: Added a public security policy/result guide and companion-scan badge. Verified that Firefox SARIF uploads are present; alert details require suitable signed-in access. Found dependency alerts/security-fix proposals disabled and enabled them, along with private vulnerability reporting. Full findings remain visible to authorized users; green CI only gates fixable HIGH/CRITICAL findings. No finding was dismissed and no running image changed.
 - 2026-10-19: Reordered this README around setup, daily use and verification; moved long evidence, design notes and history into expandable sections. Added a scoped [follow-up plan](FOLLOW-UP-PLAN.md) for remaining boot/relay coverage. No runtime configuration changed.

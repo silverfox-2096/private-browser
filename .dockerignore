@@ -31,3 +31,6 @@ maintenance/
 # Separate VPN build context and opt-in deployment template
 gluetun-patched/
 docker-compose.gluetun-candidate.yml
+
+# Runtime-only Gluetun firewall policy; mounted by Compose, not baked into Firefox.
+local-app-post-rules.txt
