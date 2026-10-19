@@ -69,10 +69,12 @@ updates:
     cooldown:
       default-days: 7
 
-  # The stable-source VPN build is our maintenance responsibility.
-  # Updates require review, an image scan and isolated VPN/browser checks.
+  # Source is fetched during Docker build. Manifest-only Go updates pruned all
+  # requirements; use the source-aware report and update-module.sh instead.
+  # Vulnerability alerts/security updates still require source-aware review.
   - package-ecosystem: gomod
     directory: /gluetun-patched
+    open-pull-requests-limit: 0
     schedule:
       interval: weekly
       day: monday
