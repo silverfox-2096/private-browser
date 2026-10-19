@@ -37,6 +37,14 @@ and no proposal replaces the operator's pinned running VPN image. Secret scannin
 and push protection are enabled. Private vulnerability reporting is enabled.
 These are repository settings; the workflow files alone do not establish their state.
 
+Verified 19 October 2026: `main` requires pull requests and an up-to-date branch
+with all eight required GitHub Actions checks: `shellcheck`, `hadolint`, `checkov`,
+`kics`, `trivy`, `fingerprint`, `scan (gluetun)` and `scan (creepjs)`. Each required
+check is bound to the GitHub Actions app. These rules also apply to administrators;
+force pushes and branch deletion are blocked, and review conversations must be
+resolved. No second-person approval is required for this single-maintainer project.
+Issues is enabled for sanitized bugs/tasks; sensitive reports use the private route.
+
 ## Report a vulnerability privately
 
 Use [Report a vulnerability](https://github.com/silverfox-2096/private-browser/security/advisories/new)
