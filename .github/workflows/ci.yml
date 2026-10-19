@@ -35,9 +35,11 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
       - name: ShellCheck (preinstalled on the runner)
-        run: shellcheck launch.sh update.sh verify.sh startup-guard.sh ci/fingerprint.sh ci/test-scripts.sh
+        run: shellcheck launch.sh update.sh verify.sh startup-guard.sh gluetun-patched/update-module.sh ci/fingerprint.sh ci/test-scripts.sh
       - name: Failure-path tests (docker/curl stubbed; no stack, no network)
         run: bash ci/test-scripts.sh
+      - name: Module update report failure paths
+        run: python3 ci/test-module-updates.py
       - name: checks.mjs verdicts (browser + bash.ws stubbed; runner Node)
         run: node ci/test-checks.mjs
 
@@ -105,7 +107,7 @@ jobs:
           exit-code: "0"
       - name: Upload SARIF to the Security tab (keeps CVEs visible even when green)
         if: always()
-        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2   # v4.38.2
+        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d   # v4.38.3
         with:
           sarif_file: trivy.sarif
 
@@ -123,7 +125,7 @@ jobs:
         run: python3 ci/test-startup-guard.py
       - name: Keep the raw CreepJS output when a check fails
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a   # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9   # v7.0.2
         with:
           name: fingerprint-out
           path: ci/out/

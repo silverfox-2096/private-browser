@@ -180,3 +180,36 @@ operator host uses an immutable-ID automatic override, so its Firefox updater
 continues to select the reviewed artifact. Do not remove that host override merely
 to synchronize repository files. Future VPN builds must receive a new review,
 scan and runtime validation before changing the override.
+
+
+## Source-aware module maintenance
+
+This repository stores module manifests while the checksum-pinned application
+source is fetched during Docker build. The observed automatic Go update PRs
+pruned this manifest-only directory into an empty dependency graph. Scheduled Go
+version PRs are paused with `open-pull-requests-limit: 0`; vulnerability alerts and
+security PRs remain enabled. Security PRs also require source-aware review.
+
+The existing weekly companion workflow retains a source-aware update report from
+`go list -mod=readonly -m -u -json all` and lists available versions in its summary.
+This observes updates without editing the locked graph or deploying an image.
+Report failures are visible; vulnerability scans still run independently first.
+
+Generate one reviewed update with
+`bash gluetun-patched/update-module.sh module/path vX.Y.Z`. The helper verifies the
+pinned source/toolchain, updates with actual source present, tidies/verifies the
+graph, verifies the requested version, and retrieves the manifests for review.
+It refuses to overwrite edits made during generation and uses a unique disposable
+container plus an immutable source-stage ID. It does not deploy an image.
+
+Review exact direct/transitive changes, run upstream race tests, then build and
+scan the candidate. Before a live replacement, validate isolated VPN/browser and
+firewall behavior, using the account's VPN credentials with only one instance at
+a time. Follow the closure/lock/gate/rollback process. A failed upstream test is a
+maintenance blocker: do not relax validation merely to make an update green.
+TOML2.4.3 currently changes diagnostic text expected by two upstream auth-config
+tests and remains held for compatibility review; both invalid inputs still error.
+
+The custom-image tag identifies a build recipe, not the deployed immutable
+artifact. Published module changes do not replace the operator's pinned image.
+Use buildinfo, scan evidence and exact image IDs to identify each candidate.
