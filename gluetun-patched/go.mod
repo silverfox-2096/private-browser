@@ -5,7 +5,7 @@ go 1.26.0
 require (
 	github.com/ProtonMail/go-srp v0.0.7
 	github.com/breml/rootcerts v0.3.3
-	github.com/fatih/color v1.18.0
+	github.com/fatih/color v1.19.0
 	github.com/golang/mock v1.6.0
 	github.com/klauspost/compress v1.18.1
 	github.com/klauspost/pgzip v1.2.6
@@ -40,7 +40,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/josharian/native v1.1.0 // indirect
-	github.com/mattn/go-colorable v0.1.13 // indirect
+	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mdlayher/genetlink v1.3.2 // indirect
 	github.com/mdlayher/netlink v1.7.2 // indirect
