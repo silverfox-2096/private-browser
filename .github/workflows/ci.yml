@@ -35,9 +35,11 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
       - name: ShellCheck (preinstalled on the runner)
-        run: shellcheck launch.sh update.sh verify.sh startup-guard.sh ci/fingerprint.sh ci/test-scripts.sh
+        run: shellcheck launch.sh update.sh verify.sh startup-guard.sh gluetun-patched/update-module.sh ci/fingerprint.sh ci/test-scripts.sh
       - name: Failure-path tests (docker/curl stubbed; no stack, no network)
         run: bash ci/test-scripts.sh
+      - name: Module update report failure paths
+        run: python3 ci/test-module-updates.py
       - name: checks.mjs verdicts (browser + bash.ws stubbed; runner Node)
         run: node ci/test-checks.mjs
 

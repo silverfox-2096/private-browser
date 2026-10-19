@@ -58,6 +58,12 @@ jobs:
           format: json
           output: companion-${{ matrix.service }}-full.json
           exit-code: "0"
+      - name: Source-aware Go module update report
+        if: always() && matrix.service == 'gluetun' && env.SCAN_IMAGE != ''
+        run: |
+          source_image=$(docker build --quiet --target source gluetun-patched)
+          timeout 180 docker run --rm "$source_image" go list -mod=readonly -m -u -json all > gluetun-module-updates.json
+          python3 ci/module-updates.py gluetun-module-updates.json >> "$GITHUB_STEP_SUMMARY"
       - name: Preserve scan evidence even when the gate fails
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -67,4 +73,5 @@ jobs:
             companion-${{ matrix.service }}.json
             companion-${{ matrix.service }}-full.json
             gluetun-build-metadata.json
+            gluetun-module-updates.json
           if-no-files-found: warn
