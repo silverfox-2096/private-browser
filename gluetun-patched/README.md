@@ -207,8 +207,20 @@ scan the candidate. Before a live replacement, validate isolated VPN/browser and
 firewall behavior, using the account's VPN credentials with only one instance at
 a time. Follow the closure/lock/gate/rollback process. A failed upstream test is a
 maintenance blocker: do not relax validation merely to make an update green.
-TOML2.4.3 currently changes diagnostic text expected by two upstream auth-config
-tests and remains held for compatibility review; both invalid inputs still error.
+TOML2.4.3 changes the exact diagnostic text for unknown fields and malformed TOML.
+The test stage applies a two-line expectation patch to a checksum-verified upstream
+test file; exact error assertions and every original test case are retained. The
+patch and added security contract are present only in the test stage. The source
+and production build stages do not modify application code.
+
+Additional tests reject unknown root/role fields, malformed input, duplicate keys,
+wrong types, missing keys, unsupported authentication methods and invalid routes.
+They also pass parsed settings through the real authorization middleware: missing
+or wrong keys and unassigned routes return401 without calling the protected handler;
+the correct key reaches the handler. The same contract passes with the prior
+library. Disposable mutation checks confirmed that removing strict-field rejection
+or accepting every API key makes these tests fail. No credentials or live VPN
+interruption are needed for these in-memory checks.
 
 The custom-image tag identifies a build recipe, not the deployed immutable
 artifact. Published module changes do not replace the operator's pinned image.
