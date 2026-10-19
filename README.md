@@ -220,10 +220,10 @@ get the same treatment: check out the branch, run `./update.sh` and `./verify.sh
 and merge only if both pass. Pull requests that only touch CI tooling (`.github/`,
 `ci/pins/`) can merge on green CI.
 
+### Maintenance window
+
 <details>
 <summary>Maintenance gate and interrupted updates</summary>
-
-### Maintenance window
 
 The image supports a maintenance flag at `maintenance/active`, mounted read-only
 into the container. While present, new web requests receive HTTP 503, including
@@ -403,7 +403,7 @@ no VPN; never use that configuration for browsing.
 ## Upstream services and a startup guard
 
 <details>
-<summary>Components, privileges, ports and checker behavior</summary>
+<summary>Components and checker behavior</summary>
 
 The stack uses a short startup guard before browser initialization and a Docker Compose
 file that wires together three existing, independently maintained images (Gluetun,
@@ -439,7 +439,12 @@ under [About the security review](#about-the-security-review) are not a
 third-party audit, so do not take them on faith. Read the compose file, and run the
 checks under [Verify it works](#verify-it-works) yourself.
 
-### What you are trusting
+</details>
+
+## What you are trusting
+
+<details>
+<summary>Privileges, ports and the local network boundary</summary>
 
 What runs, and with which privileges, as checked on the running stack in September
 2026:
@@ -654,24 +659,39 @@ situation calls for it.
 
 ## Design notes and anticipated questions
 
-<details>
-<summary>Fingerprinting, browser features, data traces and review history</summary>
-
 These are the questions a careful reviewer tends to raise. Where a setting looks unusual there is a measured reason, and where a claim can be checked the checks are under [Verify it works](#verify-it-works).
 
 ### Why is there no `user.js` with hundreds of tweaks?
 
+<details>
+<summary>Read answer</summary>
+
 The protections that matter come from the architecture rather than a long preference list. The profile is wiped every session (tmpfs), all internet traffic goes through the VPN tunnel (enforced by Gluetun's firewall in the shared network namespace), and Firefox's `resistFingerprinting` (RFP) handles most fingerprint normalization. A full arkenfox-style `user.js` was considered and set aside as largely redundant here, since its highest-value settings for disk avoidance, DNS handling, and WebRTC are already delivered by tmpfs, the VPN container, and the shared namespace. Fewer knobs means less to misconfigure or let fall out of date. The prefs that are set (RFP, letterboxing, telemetry off, and turning off link prefetch, speculative connections, and search suggestions) each add something the architecture does not. The rest switch off features Mozilla's own build adds: Google Safe Browsing, the built-in VPN button, and sponsored New Tab content.
+
+</details>
 
 ### Why are only about 3 fonts detected?
 
+<details>
+<summary>Read answer</summary>
+
 Three is the target. A container with almost no fonts is an obvious outlier, so the image installs Noto (including emoji and CJK), Liberation, FreeFont, and DejaVu to remove that one signal. It does not make the browser match any particular group of users. It reports about 3 of the 51 fonts a common probe checks. Debian's Noto package adds four rarer script families that the probe also lists (Canadian Aboriginal, Gunjala Gondi, Masaram Gondi, Yezidi), so the Dockerfile removes them; with them the probe saw 7. The other 48 are Windows and macOS families that no Debian package provides. Lookalike fonts were left out on judgement, not measurement: they seemed more likely to add inconsistencies than to remove a signal.
+
+</details>
 
 ### Why is Safe Browsing off?
 
+<details>
+<summary>Read answer</summary>
+
 Mozilla's own Firefox build ships Google Safe Browsing keys, so with the defaults it talks to Google in three ways: it downloads Google's malware and phishing lists, it asks Google for the full hashes when a page's address matches a prefix on those lists, and it can send details of some downloaded files to Google for a verdict. Those requests would still go through the VPN, but they are a standing connection to Google that this stack otherwise does not make. They are switched off, and that is an accepted trade-off rather than an oversight: you lose the built-in phishing and malware blocklist. If you want that protection back, remove the three `FF_PREF_SB_*` lines from `docker-compose.yml`.
 
+</details>
+
 ### Why is WebGL disabled? Doesn't hiding WebGL make you more unique?
+
+<details>
+<summary>Read answer</summary>
 
 This was tested rather than assumed, because it is a real trade-off.
 
@@ -681,7 +701,12 @@ Enabling it also exposes the WebGL capability set, meaning dozens of parameters 
 
 Disabling WebGL removes that surface. A browser running RFP is already identifiable as an RFP browser, so blending in with ordinary browsers is not on offer; the question is how much more it exposes. How common WebGL-off is among RFP users has not been measured. Given the choice between a masked renderer that still carries a stable software-capability fingerprint and no WebGL surface at all, disabling exposes less. The cost is that 3D sites and web maps will not render, which is acceptable for this browser.
 
+</details>
+
 ### Does a fresh session get a new fingerprint?
+
+<details>
+<summary>Read answer</summary>
 
 No. In testing, wiping the profile did not change the browser's fingerprint. In a test on one host (2026-09-26), the graphical browser loaded a self-hosted CreepJS in three fresh sessions (`docker compose down`, then `up`), once twice in the same session. All four loads produced the same CreepJS fingerprint ID, and 22 of its 23 sections were identical:
 
@@ -691,15 +716,30 @@ No. In testing, wiping the profile did not change the browser's fingerprint. In 
 
 So a site that fingerprints can link your sessions to each other even though the profile is gone. RFP removes obvious signals; it does not make the browser match a larger population, and it does not make fresh sessions unlinkable. Whether a different host gets the same fingerprint was not tested.
 
+</details>
+
 ### Does the container leak your locale or timezone?
+
+<details>
+<summary>Read answer</summary>
 
 No. RFP reports the language as `en-US` and spoofs the timezone to UTC no matter where you are. The container's own locale is set to `en_US.UTF-8`, so the operating-system locale and the browser-reported one agree and your real regional settings never reach a page. A normal host browser often leaks here even with RFP on, because its system locale differs from what RFP reports.
 
+</details>
+
 ### Why send DNS to Cloudflare instead of the VPN's own resolver?
+
+<details>
+<summary>Read answer</summary>
 
 The property that matters is encrypted DNS that never touches your ISP, and that holds: queries leave over DNS-over-TLS from inside the tunnel. Routing DNS to the VPN's own resolver would put everything with one provider, which sounds cleaner, but the VPN is already your exit and can see the TLS SNI of the sites you visit, so it learns the destinations either way. The difference is smaller than it looks, and this setup avoids the resolver-restart problems seen with other configurations. If you prefer your provider's resolver, it is a one-line change; re-run the DNS-leak check afterward.
 
+</details>
+
 ### Is it really amnesic?
+
+<details>
+<summary>Read answer</summary>
 
 The profile, yes, when you stop the stack with `docker compose down`. The entire browser profile, meaning cookies, history, logins, cache, and downloads, lives in a RAM-backed tmpfs and is discarded with the container. There is no persistent downloads folder by design, so anything you fetch is wiped too; save it off the browser first if you need to keep it.
 
@@ -709,11 +749,21 @@ One trace was found on the host, outside the stack: the web UI's clipboard panel
 
 Another caveat: tmpfs pages can be pushed to swap under memory pressure, and on a host with unencrypted swap those fragments can touch disk. If that matters to you, encrypt your swap or turn it off. On a host with encrypted swap this is already covered.
 
+</details>
+
 ### Doesn't the clipboard bridge weaken the isolation?
+
+<details>
+<summary>Read answer</summary>
 
 A little, and it is worth being precise about. Clipboard sharing is a built-in feature of jlesage's web UI, not something this stack adds, and there is no environment variable to turn it off. Two paths exist: a manual clipboard box in the control panel, and automatic synchronization that activates in Chromium-based viewers served over HTTPS. Both are bidirectional, container to host as well as host to container, so treat the clipboard as a real channel in both directions. It is reachable only over the loopback-bound web UI, so nothing on your LAN can touch it. If that channel matters to you, do not paste through the control panel, and view the UI in a browser that does not trigger the automatic sync. The panel's text can also end up on your disk through the viewing browser's session restore; see [Is it really amnesic?](#is-it-really-amnesic).
 
+</details>
+
 ### About the security review
+
+<details>
+<summary>Read answer</summary>
 
 The configuration was checked with an automated security review, Claude Code's `/security-review`, run in a separate session over the files in this repository. It reported no vulnerabilities within that scope. This is not a third-party human audit or a runtime penetration test. No automated review is a guarantee: a later review of these docs caught claims this one missed, an environment variable that did nothing and a downloads folder that did not actually persist, both since corrected. Treat it as one input, not a seal of approval, and check the design yourself: there is no custom service code, the risk surface is the configuration, the images and the scripts, and all of it is here to read alongside the verification steps.
 
