@@ -244,29 +244,27 @@ exit and handled interruptions.
 
 ## Remaining work
 
-The startup/DNS/checker fixes are deployed; reviewed dependency recipes are
-published, while the maintainer’s running VPN image stays pinned. The remaining
-items are coverage gaps, not newly demonstrated bypasses.
+The configuration-specific relay review is complete. Authenticated local apps can
+originate requested traffic through their own network, outside the browser VPN.
+The default Compose configuration now mounts a [local-app access policy](LOCAL-APP-POLICY.md)
+that blocks browser-initiated connections to private/local addresses. Local dashboards,
+media servers and other Docker apps are intentionally unavailable inside this browser.
 
-1. Identify actual local services that could forward traffic and review their access controls.
-2. Test any relevant forwarding path, including IPv6; add process attribution where it resolves a specific uncertainty.
-3. Consider a separately scoped host-boot experiment after the narrower tests.
-
-The [follow-up plan](FOLLOW-UP-PLAN.md) defines the evidence needed, stop conditions
-and approval boundaries. No reboot or repeat of the completed collector is requested.
+Actual host-boot tunnel-absent timing remains a separate coverage gap. No reboot or
+repeat of the completed collector is requested by this change.
 
 ## What has been tested
 
-The [19 October local forwarding review](FOLLOW-UP-RESULTS.md) refreshed the current
-service inventory and installed peer request paths. Seven anonymous configuration
-GETs returned 401, with public-route reachability controls. No forwarding transaction
-ran; wider relay/IPv6 coverage remains [open](https://github.com/silverfox-2096/private-browser/issues/32).
+The [initial 19 October forwarding review](FOLLOW-UP-RESULTS.md) records the earlier
+anonymous access checks. The subsequent review exercised an unchanged application
+fetch route in a disposable instance with normal authentication, demonstrated
+controlled IPv4/IPv6 loopback fetches and attributed a requested external SYN to
+that application's namespace and physical host egress. External HTTPS completion
+timed out; no production authenticated account was used.
 
-
-**Coverage is limited to the recorded hosts, targets and states.** Actual
-host-boot tunnel-absent timing, arbitrary host/bridge forwarding, IPv6 regeneration
-and independent regenerated-socket attribution remain unverified. Local Docker
-network reachability is allowed by design. See the [follow-up plan](FOLLOW-UP-PLAN.md).
+The [local-app policy](LOCAL-APP-POLICY.md) describes the restriction, validation
+and limits. Coverage remains specific to recorded targets and states; it does not
+establish universal software safety or actual host-boot timing.
 
 <details>
 <summary>Dated runtime results, packet evidence and limitations</summary>

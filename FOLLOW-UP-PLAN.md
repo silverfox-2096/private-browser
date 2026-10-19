@@ -1,5 +1,11 @@
 # Remaining validation plan
 
+> Superseded for local relay scope: the configuration-specific review is complete.
+> Authenticated delegation was demonstrated in an isolated instance of deployed code.
+> The stricter default [local-app policy](LOCAL-APP-POLICY.md) blocks private/local
+> destinations. The historical work packages below are retained as provenance;
+> actual host-boot timing remains separate.
+
 Updated 19 October 2026. This plan separates unverified coverage from demonstrated
 faults. The startup guard, Docker DNS fix and checker reliability changes are
 deployed. Reviewed module updates are published; the operator's running VPN image
