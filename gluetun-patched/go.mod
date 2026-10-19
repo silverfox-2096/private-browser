@@ -9,7 +9,7 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/klauspost/compress v1.18.1
 	github.com/klauspost/pgzip v1.2.6
-	github.com/pelletier/go-toml/v2 v2.2.4
+	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/qdm12/dns/v2 v2.0.0-rc9.0.20260421173011-9de8e7fdbe3a
 	github.com/qdm12/gosettings v0.4.4
 	github.com/qdm12/goshutdown v0.3.0

@@ -2,3 +2,6 @@
 !Dockerfile
 !go.mod
 !go.sum
+!tests/
+!tests/configfile-diagnostics.patch
+!tests/auth_contract_test.go

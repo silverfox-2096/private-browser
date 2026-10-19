@@ -15,7 +15,13 @@ FROM source AS test
 RUN apk add --no-cache build-base
 # Keep test execution separate from compiler installation for readable failures.
 # hadolint ignore=DL3059
-RUN CGO_ENABLED=1 go test -race -count=1 ./...
+COPY tests/configfile-diagnostics.patch /tmp/configfile-diagnostics.patch
+COPY tests/auth_contract_test.go internal/server/middlewares/auth/pb_contract_test.go
+# Only test diagnostics change. Pin the original test to fail on source drift.
+RUN printf '%s\n' "bb1e76ed06d4b8b92467595ec18c2c85f37f8df31e55ec4c1583e40dbecc76d6  internal/server/middlewares/auth/configfile_test.go" > /tmp/upstream-test.sha256 \
+    && sha256sum -c /tmp/upstream-test.sha256 \
+    && patch -p1 -F 0 < /tmp/configfile-diagnostics.patch \
+    && CGO_ENABLED=1 go test -race -count=1 ./...
 
 FROM source AS build
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.version=v3.41.3-pb1 -X main.created=2026-10-18 -X main.commit=3d1e20c5551e9cae1f9d938dc7b7214a6987f27e" -o /entrypoint cmd/gluetun/main.go
