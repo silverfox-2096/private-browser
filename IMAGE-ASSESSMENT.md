@@ -46,7 +46,7 @@ evidence or precise blocker, owner and review trigger.
 | perl | 1 | Archive::Tar is absent; perl-base remains installed. Reassess if modules are added. |
 | tiff | 2 | tiffcrop tool absent for CVE-2026-52490. CVE-2026-36849 remains pending: GTK TIFF loader and libtiff are installed; hostile TIFF delivery and affected tag parsing need a consumer-specific check. |
 | libX11, libXrender, libXtst | 3 | Malicious X-server reply prerequisites differ from a web-page attack. Local GUI uses X libraries; actual affected API use and hostile-server control remain unproved. |
-| wget | 2 | Conversion functions need attacker-selected HTML/filenames and relevant conversion options. wget is installed for probes; reviewed verifier does not request link conversion. Other invocations are not exhaustively excluded. |
+| wget | 2 | CVE-2026-58471 concerns character-set conversion of server-supplied filenames; CVE-2026-58472 concerns HTML attribute entity encoding. Lack of --convert-links does not rule out the filename case. wget is installed for probes; actual response/charset/attribute caller conditions remain unresolved. |
 | ncurses | 1 | infocmp is installed; attacker-controlled terminfo/entry processing by an actual caller remains unproved. |
 | libsndfile | 1 | WAV IMA ADPCM code is installed; actual untrusted-WAV delivery to an installed consumer remains unproved. |
 | acl | 1 | Pathname/symlink APIs are installed; a privileged caller crossing an attacker-controlled pathname remains unproved. Root GUI/init paths are not excluded by browser UID/no-new-privileges alone. |
