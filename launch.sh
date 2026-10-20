@@ -45,4 +45,13 @@ if [ "$ready" -ne 1 ]; then
   echo "Check:  docker ps   and   docker logs $GLUETUN" >&2
   exit 1
 fi
+policy_rc=0
+python3 ./check-local-app-policy.py || policy_rc=$?
+case "$policy_rc" in
+  0) ;;
+  1) exit 1 ;;
+  3) exit 3 ;;
+  *) echo "INCOMPLETE  local-app policy: checker unavailable (exit $policy_rc)" >&2; exit 3 ;;
+esac
+
 xdg-open "$UI" 2>/dev/null || echo "Open $UI"

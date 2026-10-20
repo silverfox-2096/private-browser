@@ -44,6 +44,15 @@ while [ "$SECONDS" -lt "$end" ]; do
 done
 [ "$ui" -eq 1 ] || die "web UI at $UI did not answer within 30 s"
 
+policy_rc=0
+python3 ./check-local-app-policy.py || policy_rc=$?
+case "$policy_rc" in
+  0) ;;
+  1) exit 1 ;;
+  3) exit 3 ;;
+  *) echo "INCOMPLETE  local-app policy: checker unavailable (exit $policy_rc)" >&2; exit 3 ;;
+esac
+
 echo
 echo "$ver"
 echo

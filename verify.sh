@@ -67,6 +67,22 @@ if [ "$status" != "healthy" ]; then
   exit 2
 fi
 
+
+policy_check() {
+  local rc=0
+  python3 ./check-local-app-policy.py || rc=$?
+  case "$rc" in
+    0) return 0 ;;
+    1) fail=1; return 1 ;;
+    3) incomplete=1; return 3 ;;
+    *) inc "local-app policy: checker unavailable (exit $rc)"; return 3 ;;
+  esac
+}
+# Refuse disruptive testing when current policy is missing or unobservable.
+policy_rc=0
+policy_check || policy_rc=$?
+[ "$policy_rc" -eq 0 ] || exit "$policy_rc"
+
 # Undo ONLY what we changed: if the kill-switch test stopped Gluetun, bring it back and
 # reattach Firefox (and CreepJS, which is left in the dead namespace otherwise). If we
 # never stopped it, do nothing. Every step is checked, and Firefox must reach the probe
@@ -89,6 +105,7 @@ restore() {
     return 0
   fi
   stopped=0
+  policy_check || return 0
   for i in 1 2 3 4 5 6; do   # Firefox's container needs a few seconds after restart
     probe && { info "stack restored; Firefox reaches $PROBE again"; return 0; }
     [ "$i" -lt 6 ] && sleep 5

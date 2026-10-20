@@ -106,11 +106,20 @@ N=_=_   # placeholder env when a case needs none
 # Scripts run from a scratch copy: launch.sh needs a webauth-htpasswd beside it.
 W="$SD/w"; mkdir -p "$W"
 for s in verify.sh update.sh launch.sh; do [ -f "$DIR/$s" ] && cp "$DIR/$s" "$W/"; done
+cat > "$W/check-local-app-policy.py" <<'POLICY_STUB'
+import os, sys
+rc = int(os.environ.get("S_POLICY_RC", "0"))
+print(("PASS" if rc == 0 else "FAIL" if rc == 1 else "INCOMPLETE") + "  local-app policy: test fixture")
+sys.exit(rc)
+POLICY_STUB
 touch "$W/webauth-htpasswd"
 mkdir -p "$W/ci" && cp -r "$DIR/ci/fingerprint.sh" "$DIR/ci/pins" "$W/ci/"
 
 echo "== verify.sh"
 SCRIPT=verify.sh ARGS=SG
+t "policy missing despite healthy controls" 1 'FAIL  local-app policy' 'ALL AUTOMATED CHECKS PASSED|UPDATED\.|xdg-open' S_POLICY_RC=1
+t "policy observation incomplete" 3 'INCOMPLETE  local-app policy' 'ALL AUTOMATED CHECKS PASSED|UPDATED\.|xdg-open' S_POLICY_RC=3
+t "policy checker failed to execute" 3 'checker unavailable' 'ALL AUTOMATED CHECKS PASSED|UPDATED\.|xdg-open' S_POLICY_RC=127
 
 t "all good"                        0 '^PASS  kill switch'         "$HOST"  $N
 t "host IP unavailable"             3 '^INCOMPLETE  exit IP'       ''       S_HOST_IP= S_HOST_RC=6
@@ -184,6 +193,9 @@ else failn=$((failn+1)); echo "FAIL  unbounded docker calls:"; printf '%s\n' "$u
 echo
 echo "== update.sh"
 SCRIPT=update.sh ARGS=
+t "policy missing despite healthy controls" 1 'FAIL  local-app policy' 'ALL AUTOMATED CHECKS PASSED|UPDATED\.|xdg-open' S_POLICY_RC=1
+t "policy observation incomplete" 3 'INCOMPLETE  local-app policy' 'ALL AUTOMATED CHECKS PASSED|UPDATED\.|xdg-open' S_POLICY_RC=3
+t "policy checker failed to execute" 3 'checker unavailable' 'ALL AUTOMATED CHECKS PASSED|UPDATED\.|xdg-open' S_POLICY_RC=127
 t "update: all good"                0 '^UPDATED'                   ''         $N
 t "update: build fails"             1 'FAILED: image build'        '^UPDATED' S_BUILD_RC=1
 t "update: creepjs build fails"      1 'FAILED: build of the creepjs'               '^UPDATED' S_PULL_RC=1
@@ -196,6 +208,9 @@ t "update: web UI never answers"    1 'did not answer within 30 s' '^UPDATED' S_
 
 echo "== launch.sh"
 SCRIPT=launch.sh ARGS=
+t "policy missing despite healthy controls" 1 'FAIL  local-app policy' 'ALL AUTOMATED CHECKS PASSED|UPDATED\.|xdg-open' S_POLICY_RC=1
+t "policy observation incomplete" 3 'INCOMPLETE  local-app policy' 'ALL AUTOMATED CHECKS PASSED|UPDATED\.|xdg-open' S_POLICY_RC=3
+t "policy checker failed to execute" 3 'checker unavailable' 'ALL AUTOMATED CHECKS PASSED|UPDATED\.|xdg-open' S_POLICY_RC=127
 t "launch: all good"                0 ''                           'did not become ready' $N
 t "launch: compose fails, old UI answers" 1 'compose up failed'    ''         S_UP_RC=1
 t "launch: gluetun never healthy"   1 'did not become ready in 30s' ''        S_HEALTH=starting

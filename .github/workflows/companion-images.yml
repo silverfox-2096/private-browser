@@ -38,6 +38,12 @@ jobs:
           echo "SCAN_IMAGE=$image" >> "$GITHUB_ENV"
           # shellcheck disable=SC2016 # Markdown backticks are literal.
           printf '## %s\n\nImage: `%s`\n' "$SERVICE" "$image" >> "$GITHUB_STEP_SUMMARY"
+      - name: Isolated dual-stack local policy controls and mutations (no VPN credentials)
+        if: matrix.service == 'gluetun' && env.SCAN_IMAGE != ''
+        run: |
+          fixture_image=$(sed -n 's/^ *image: *\(python:.*\)/\1/p' ci/pins/compose.yml)
+          docker pull "${fixture_image:?no Python fixture pin}"
+          python3 ci/test-local-app-policy-network.py --firewall-image "$SCAN_IMAGE" --python-image "$fixture_image"
       - name: Gate on fixable HIGH and CRITICAL vulnerabilities
         if: env.SCAN_IMAGE != ''
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
