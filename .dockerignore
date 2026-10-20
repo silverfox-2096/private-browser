@@ -34,3 +34,11 @@ docker-compose.gluetun-candidate.yml
 
 # Runtime-only Gluetun firewall policy; mounted by Compose, not baked into Firefox.
 local-app-post-rules.txt
+
+# Host policy gate and maintenance sources never belong in the browser image.
+check-local-app-policy.py
+probe/
+upkeep/
+
+__pycache__/
+*.pyc

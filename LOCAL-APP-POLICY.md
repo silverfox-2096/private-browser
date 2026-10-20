@@ -66,3 +66,44 @@ browser, restore that file and recreate only the VPN/browser services with the s
 images; preserve any shared network and other applications. Restoring the prior
 configuration also restores its local-app delegation exposure. Never leave the
 browser running while deliberately disabling its firewall.
+
+## Maintained policy acceptance gate
+
+Run `python3 check-local-app-policy.py` from the stack directory for a read-only,
+host-side assertion. Python3 is required on the host. Exit0 is PASS,1 is an
+observed policy defect,3 is INCOMPLETE because required evidence could not be read.
+The expected private/local ranges are defined independently in the checker, so an
+empty policy file cannot shrink the expectations to nothing.
+
+The gate requires the expected read-only bind source and exact policy contents,
+the real browser's shared VPN namespace, and active IPv4/IPv6 kernel OUTPUT rejects
+before every general allow. It also requires the loopback/reply controls and refuses
+privileged/NET_ADMIN browser configurations. It executes no policy text and grants
+Firefox no firewall capability. `verify.sh` checks before its disruptive tests and
+after recovery; `launch.sh` and `update.sh` check before reporting ready/updated.
+The maintained `probe/checks.sh` checks before starting headless tests, and
+`upkeep/pb-autoupdate.sh` preserves FAIL/INCOMPLETE through rollback. Policy PASS is
+separate from the existing seven browser checks.
+
+Upgrade existing installations by copying the root checker alongside the host
+scripts and updating those scripts together. If the maintainer's optional user
+updater is already installed, its maintained sources are now under `upkeep/` and
+`probe/`: update `pb-autoupdate.sh` in `~/.local/bin/`, `probe/checks.sh` in
+`~/.local/share/pb-autoupdate/`, and keep `ci/checks.mjs` plus
+`ci/creep-baseline.json` there. Do not copy credentials or add/enable a timer merely
+to install this gate. A missing checker cannot receive PASS.
+
+CI inspects the actual published Compose mount, runs checker and wrapper/updater
+mutations, and runs credential-free real IPv4/IPv6 fixtures against the candidate
+firewall image. The isolated suite proves working unprotected controls, rejection
+counters for actual new and already-established outgoing requests, preserved incoming
+replies/loopback, and synthetic tun0/UDP transport. It tests removed/missing/empty/
+partial/malformed policy, rule ordering and missing IPv6 handling. The matching
+Gluetun loader contracts retain its real distinctions: optional missing/empty or
+unrecognized files can succeed; recognized command errors and unsupported IPv6 fail.
+
+These are point-in-time acceptance gates, not continuous kernel monitoring or a new
+startup attestation. The synthetic route/transport fixture is not encrypted VPN or
+actual host-boot evidence. Normal public HTTPS/DNS and real viewer/API behavior need
+separate authorized deployment validation; a failed command or missing observation
+is never treated as network denial.

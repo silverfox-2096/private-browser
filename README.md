@@ -47,6 +47,7 @@ Three things to know before you start:
 ## Requirements
 
 - Docker and Docker Compose
+- Python3 on the host for the trusted local-app policy gate
 - A WireGuard config from any
   [Gluetun-supported provider](https://github.com/qdm12/gluetun/wiki). This example
   uses Proton VPN.
@@ -261,6 +262,11 @@ consistency (R3), and residual actual host-boot validation (R4). One open boot i
 does not represent the whole backlog. The [dated exact-image assessment](IMAGE-ASSESSMENT.md) records R1 evidence and
 remaining operator disposition. Next: record that disposition and prepare isolated
 policy regression tests. No reboot or collector rerun is requested.
+
+The [maintained policy gate](LOCAL-APP-POLICY.md#maintained-policy-acceptance-gate)
+checks mounted source, namespace and active ordered IPv4/IPv6 rules independently
+of general VPN health or browser7/7. Run `python3 check-local-app-policy.py` for a
+read-only assertion; `verify.sh` includes it before and after its recovery test.
 
 ## What has been tested
 
@@ -826,6 +832,7 @@ Latest: assessed retained advisories against exact deployed images; residual-ris
 <details>
 <summary>Release and maintenance history — latest 20 October 2026</summary>
 
+- 2026-10-20: Added a trusted host local-app policy assertion to launch/update/verification and maintained browser/updater paths, plus Compose/checker/wrapper mutations, pinned loader contracts and real isolated dual-stack CI controls. Broken policy cannot inherit PASS from VPN health or browser7/7. FAIL/INCOMPLETE remain distinct through rollback. No Firefox firewall privilege added. See [gate scope and installation](LOCAL-APP-POLICY.md#maintained-policy-acceptance-gate); deployment is a separate recorded stage.
 - 2026-10-20: Assessed retained advisories against read-only archives of the exact deployed Firefox/Gluetun images with a fresh database. Firefox retains 504 observations, including 116 High/Critical package rows across 42 source/advisory groups; Gluetun retains one UNKNOWN and no High/Critical. Recorded scoped absent-feature/browser-mapping evidence and precise applicability blockers, vendor status, owners and manual review triggers. No finding dismissed, risk accepted, image replaced or schedule added. See [assessment and exact-image scan method](IMAGE-ASSESSMENT.md).
 - 2026-10-20: Corrected the introduction to match the deployed private/local-address block, preserving loopback, incoming replies and public-address limits. Consolidated [current remediation status](FOLLOW-UP-PLAN.md#current-status-register): retained advisory assessment, maintained policy regression gates and residual boot validation remain open. Dated runtime observations remain historical; this documentation change does not alter the live stack or certify those remaining packages.
 - 2026-10-19: Blocked browser-initiated connections to host/LAN/Docker apps at private/local addresses using Gluetun's read-only [post-firewall rules](local-app-post-rules.txt). This prevents the reviewed local-app delegation path, including authenticated fetch features. Deployed after browser closure: isolated IPv4/IPv6 controls, live before/after local-app controls, tunnel-down denial and tunnel/container restart persistence passed; public HTTPS/DNS, viewer/API authentication and browser checks7/7 passed. The pinned images/override, explicit DNS, startup guard and shared network remain unchanged. Local apps intentionally stop opening inside Private Browser; publicly addressed internet services remain accessible through the VPN. A mistaken final viewer-status assertion rolled back safely before the corrected retry passed. See [policy and validation](LOCAL-APP-POLICY.md).

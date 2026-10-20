@@ -14,3 +14,6 @@ ci/out/
 
 # Host-controlled updater flag
 maintenance/active
+
+__pycache__/
+*.pyc
