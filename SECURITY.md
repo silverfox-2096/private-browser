@@ -28,6 +28,13 @@ visible and review applicability/upstream fixes; do not dismiss it merely to mak
 the page or badge look clean. Patched Gluetun has its own scan and evidence, not
 the same result set as Firefox.
 
+## Exact deployed images and retained findings
+
+[The dated image assessment](IMAGE-ASSESSMENT.md) records current exact-artifact
+scan scope, prioritized package/path evidence and unresolved decisions. It also
+provides a manual archive-scanning pattern; routine recipe CI is separate. No
+alert is dismissed by that assessment, and residual risk is not silently accepted.
+
 ## Repository protection settings
 
 Verified 19 October 2026: dependency vulnerability alerts and Dependabot security-fix

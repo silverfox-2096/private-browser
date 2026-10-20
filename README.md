@@ -258,8 +258,9 @@ The [current status register](FOLLOW-UP-PLAN.md#current-status-register) tracks 
 remaining packages: retained advisory assessment against exact deployed images
 (R1), maintained local-app policy regression gates (R2), documentation/publication
 consistency (R3), and residual actual host-boot validation (R4). One open boot issue
-does not represent the whole backlog. Next: assess retained advisories and prepare
-isolated policy regression tests. No reboot or collector rerun is requested.
+does not represent the whole backlog. The [dated exact-image assessment](IMAGE-ASSESSMENT.md) records R1 evidence and
+remaining operator disposition. Next: record that disposition and prepare isolated
+policy regression tests. No reboot or collector rerun is requested.
 
 ## What has been tested
 
@@ -820,11 +821,12 @@ interchangeable.
 
 ## Changelog
 
-Latest: corrected current privacy-boundary wording and consolidated remediation status. Expand for dated changes.
+Latest: assessed retained advisories against exact deployed images; residual-risk disposition pending. Expand for dated changes.
 
 <details>
 <summary>Release and maintenance history — latest 20 October 2026</summary>
 
+- 2026-10-20: Assessed retained advisories against read-only archives of the exact deployed Firefox/Gluetun images with a fresh database. Firefox retains 504 observations, including 116 High/Critical package rows across 42 source/advisory groups; Gluetun retains one UNKNOWN and no High/Critical. Recorded scoped absent-feature/browser-mapping evidence and precise applicability blockers, vendor status, owners and manual review triggers. No finding dismissed, risk accepted, image replaced or schedule added. See [assessment and exact-image scan method](IMAGE-ASSESSMENT.md).
 - 2026-10-20: Corrected the introduction to match the deployed private/local-address block, preserving loopback, incoming replies and public-address limits. Consolidated [current remediation status](FOLLOW-UP-PLAN.md#current-status-register): retained advisory assessment, maintained policy regression gates and residual boot validation remain open. Dated runtime observations remain historical; this documentation change does not alter the live stack or certify those remaining packages.
 - 2026-10-19: Blocked browser-initiated connections to host/LAN/Docker apps at private/local addresses using Gluetun's read-only [post-firewall rules](local-app-post-rules.txt). This prevents the reviewed local-app delegation path, including authenticated fetch features. Deployed after browser closure: isolated IPv4/IPv6 controls, live before/after local-app controls, tunnel-down denial and tunnel/container restart persistence passed; public HTTPS/DNS, viewer/API authentication and browser checks7/7 passed. The pinned images/override, explicit DNS, startup guard and shared network remain unchanged. Local apps intentionally stop opening inside Private Browser; publicly addressed internet services remain accessible through the VPN. A mistaken final viewer-status assertion rolled back safely before the corrected retry passed. See [policy and validation](LOCAL-APP-POLICY.md).
 - 2026-10-19: Completed the [configuration-specific relay assessment](FOLLOW-UP-RESULTS.md#completed-assessment-and-containment). An isolated instance of unchanged deployed application code, with normal authentication/TLS and no production credentials, completed controlled IPv4/IPv6 loopback fetches; its requested external SYN was attributed to its process/socket and host physical egress outside Gluetun. External HTTPS completion timed out. No anonymous arbitrary-destination relay was established in the reviewed live paths. These bounded results supersede the earlier open-ended relay work; actual host-boot timing remains separate.
