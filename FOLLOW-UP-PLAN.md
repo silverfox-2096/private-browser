@@ -1,9 +1,29 @@
-# Remaining validation plan
+# Current remediation status and validation plan
 
-Updated 19 October 2026 after the completed relay assessment and deployed local-app
-restriction. The startup guard, explicit Docker DNS, checker fixes and local-app
-policy are deployed. Published dependency maintenance does not replace the
-operator's pinned running VPN image.
+Updated 20 October 2026. This is the public current-status register. Dated reports
+in [FOLLOW-UP-RESULTS.md](FOLLOW-UP-RESULTS.md) and the README changelog retain
+their original scope; their earlier next steps do not supersede this register.
+
+## Current status register
+
+| Package / category | Current state | Next action or closure evidence |
+|---|---|---|
+| Completed baseline | Explicit Docker DNS, startup/checker fixes and private/local-address policy deployed and published | [DNS evidence](HOST-FORWARDING.md), [policy validation](LOCAL-APP-POLICY.md), [bounded relay closeout](FOLLOW-UP-RESULTS.md#completed-assessment-and-containment), [dated changelog](README.md#changelog). These scoped results do not close R1/R2/R4. |
+| R3 — Documentation/status/publication | Source corrections complete in this revision; publication recorded separately | Current introduction, register and historical-report pointers agree. Closure also requires protected PR checks/merge, successful exact-main checks and synchronized local publication snapshots; consult the PR/check history and operator checkpoint for those stages. |
+| R1 — Retained advisories / exact deployed artifacts | OPEN — deployment-specific assessment incomplete | Prioritize Critical/High advisory groups against exact image/package identities, vendor/backport status and affected paths. Record supported dispositions or precise evidence gaps, owners and review triggers. Keep exact-live scans distinct from fresh recipe scans; [green CI gates fixable findings only](SECURITY.md#what-a-green-check-means). The remediated original 31 HIGH Gluetun findings are a separate result set. |
+| R2 — Maintained local-app policy gates | OPEN — deployed protection tested; dedicated routine gate absent | Sanitize isolated IPv4/IPv6 fixtures and add trusted installed-rules/order checks. Missing mounts, empty/partial rules, wrong ordering and broken address-family handling must not PASS when general health/browser checks do. Verify denial with working controls, allow incoming replies/loopback/VPN transport, and preserve FAIL/INCOMPLETE through wrappers/updater. Existing browser7/7 does not certify this policy. |
+| R4 — Residual actual-boot validation | OPEN — awaiting bounded design and separate authorization | Reuse [issue #33](https://github.com/silverfox-2096/private-browser/issues/33) after R1/R2 work. Existing collection did not observe a tunnel-absent executed-request window. Design alone does not close validation; operator acceptance of remaining uncertainty must be explicit. |
+| Deliberately parked / accepted | Clipboard/private-viewer persistence tests parked; Safe Browsing off accepted | Optional inactive-collector removal and publicity/Projects/Discussions/Releases/Tags remain deferred. Wider forensic, multi-host and public-address relay limits are explicit scope limits, not additional automatic work packages. |
+
+Next: R1 assessment and R2 isolated implementation. No new schedule, live image
+replacement, interruption, root installation, collector run or reboot is authorized
+by this plan. Material residual-risk decisions belong to the operator.
+
+Deployment, public publication and post-merge verification are separate stages.
+For each package retain exact source/image identities, tests (PASS/FAIL/INCOMPLETE),
+failed attempts, rollback/recovery if touched, PR/exact-head checks, merge and
+exact-main checks, then synchronize the clean checkout/changelog/snapshots. A
+prepared or published change alone is not a completed live validation.
 
 ## Completed local relay scope
 

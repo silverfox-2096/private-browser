@@ -6,10 +6,13 @@
 ![Last commit](https://img.shields.io/github/last-commit/silverfox-2096/private-browser)
 
 Firefox in a Docker container whose only way to the internet is a WireGuard VPN
-tunnel. If the tunnel drops, Gluetun's firewall blocks the internet and your LAN; the
-browser can still reach other containers on its Docker network and, depending on
-your host's firewall, services on the host itself (see
-[What has been tested](#what-has-been-tested)).
+tunnel. Gluetun's firewall blocks internet traffic when the tunnel drops. The
+[local-app policy](LOCAL-APP-POLICY.md) also rejects browser-initiated connections
+to private/local addresses, including host, LAN and Docker applications, with the
+tunnel up or down. Namespace loopback and replies to authenticated incoming
+viewer/API requests remain available. Publicly addressed internet services remain
+reachable through the VPN and may make their own requests; this is not universal
+relay prevention (see [What has been tested](#what-has-been-tested)).
 The profile lives in RAM and is wiped when you stop the stack with
 `docker compose down`.
 
@@ -251,8 +254,12 @@ The default Compose configuration now mounts a [local-app access policy](LOCAL-A
 that blocks browser-initiated connections to private/local addresses. Local dashboards,
 media servers and other Docker apps are intentionally unavailable inside this browser.
 
-Actual host-boot tunnel-absent timing remains a separate coverage gap. No reboot or
-repeat of the completed collector is requested by this change.
+The [current status register](FOLLOW-UP-PLAN.md#current-status-register) tracks all
+remaining packages: retained advisory assessment against exact deployed images
+(R1), maintained local-app policy regression gates (R2), documentation/publication
+consistency (R3), and residual actual host-boot validation (R4). One open boot issue
+does not represent the whole backlog. Next: assess retained advisories and prepare
+isolated policy regression tests. No reboot or collector rerun is requested.
 
 ## What has been tested
 
@@ -813,11 +820,12 @@ interchangeable.
 
 ## Changelog
 
-Latest: deployed local-app access restriction and completed configuration-specific relay review. Expand for dated changes.
+Latest: corrected current privacy-boundary wording and consolidated remediation status. Expand for dated changes.
 
 <details>
-<summary>Release and maintenance history — latest 19 October 2026</summary>
+<summary>Release and maintenance history — latest 20 October 2026</summary>
 
+- 2026-10-20: Corrected the introduction to match the deployed private/local-address block, preserving loopback, incoming replies and public-address limits. Consolidated [current remediation status](FOLLOW-UP-PLAN.md#current-status-register): retained advisory assessment, maintained policy regression gates and residual boot validation remain open. Dated runtime observations remain historical; this documentation change does not alter the live stack or certify those remaining packages.
 - 2026-10-19: Blocked browser-initiated connections to host/LAN/Docker apps at private/local addresses using Gluetun's read-only [post-firewall rules](local-app-post-rules.txt). This prevents the reviewed local-app delegation path, including authenticated fetch features. Deployed after browser closure: isolated IPv4/IPv6 controls, live before/after local-app controls, tunnel-down denial and tunnel/container restart persistence passed; public HTTPS/DNS, viewer/API authentication and browser checks7/7 passed. The pinned images/override, explicit DNS, startup guard and shared network remain unchanged. Local apps intentionally stop opening inside Private Browser; publicly addressed internet services remain accessible through the VPN. A mistaken final viewer-status assertion rolled back safely before the corrected retry passed. See [policy and validation](LOCAL-APP-POLICY.md).
 - 2026-10-19: Completed the [configuration-specific relay assessment](FOLLOW-UP-RESULTS.md#completed-assessment-and-containment). An isolated instance of unchanged deployed application code, with normal authentication/TLS and no production credentials, completed controlled IPv4/IPv6 loopback fetches; its requested external SYN was attributed to its process/socket and host physical egress outside Gluetun. External HTTPS completion timed out. No anonymous arbitrary-destination relay was established in the reviewed live paths. These bounded results supersede the earlier open-ended relay work; actual host-boot timing remains separate.
 - 2026-10-19: Enforced PRs and all eight app-bound CI/companion checks on up-to-date branches for main, including administrators; blocked force pushes/deletion without requiring a second reviewer. Enabled Issues with minimal bug/task templates and private-report routing. Refreshed the bounded [local forwarding review](FOLLOW-UP-RESULTS.md); seven anonymous configuration requests were rejected, while forwarding/IPv6 and actual host-boot gaps remain open. No live service/image/configuration changed.
