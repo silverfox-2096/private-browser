@@ -61,7 +61,9 @@ There is no guaranteed response time or vulnerability bounty.
 The current main branch is the maintenance target; published recipes and an
 individual installation can differ. Keep the exact image identity with any report.
 Review [test coverage](README.md#what-has-been-tested) and the
-[remaining validation plan](FOLLOW-UP-PLAN.md). Boot timing, arbitrary local relays,
+[current remediation register](FOLLOW-UP-PLAN.md#current-status-register), including
+retained-advisory assessment and maintained local-app policy gates. Boot timing,
+arbitrary local relays,
 IPv6 regeneration and independent socket attribution have explicit limits.
 Replacing a live VPN image needs separate validation and a maintenance window;
 repository alerts or a green public build do not perform that deployment.

@@ -1,5 +1,9 @@
 # Local forwarding review — 19 October 2026
 
+Current work and next actions are tracked in the
+[status register](FOLLOW-UP-PLAN.md#current-status-register), including advisory
+assessment and maintained policy gates as well as residual boot validation.
+
 ## Completed assessment and containment
 
 The configuration-specific review is complete. A reachable local application's
@@ -139,7 +143,7 @@ the selected images. Those attempts remain unsuccessful evidence, separate from
 the completed nine-request run. The installed Python tool image then completed the
 checks; nothing was installed into the browser or VPN.
 
-## Remaining transaction and boot work
+## Historical next steps before containment
 
 The host has a public IPv6 route while the VPN namespace has no public IPv6 route.
 An IPv4-facing service could still regenerate over IPv6. Without an applicable
