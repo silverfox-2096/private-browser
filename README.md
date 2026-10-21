@@ -21,14 +21,15 @@ the VPN and kill switch and jlesage's [GUI base image](https://github.com/jlesag
 for a VNC web UI, with Firefox installed from Mozilla's own APT repository and
 hardened with Firefox's own `resistFingerprinting`.
 
-> Latest follow-up validation: 2026-10-19. Local-app delegation is now blocked at
-> private/local addresses; VPN recovery and browser checks7/7 passed. The deployed
-> startup/DNS/checker fixes also passed their scoped checks; published dependency updates
-> do not replace the maintainer's pinned live VPN image. See the [changelog](#changelog).
-> Baseline runtime/leak review: 2026-09-26, on one host (Firefox 156, Gluetun v3.41.3);
-> older test matrices retain their own dates. Coverage and remaining boot/remote-relay
-> limits are under [What has been tested](#what-has-been-tested). This is not an
-> independent security audit.
+> Latest follow-up validation: 2026-10-21. The [actual guarded boot observation](BOOT-VALIDATION.md)
+> supports the bounded startup-barrier finding; its original recorder-wide INCOMPLETE
+> verdict and supplementary evidence are retained. Network4/4, browser7/7 and policy
+> recovery passed. R1's time-bounded retained-image disposition and R2's installed
+> gates are recorded in the [current status register](FOLLOW-UP-PLAN.md#current-status-register).
+> Published dependency recipes do not replace the pinned live VPN image.
+> Baseline runtime/leak review: 2026-09-26, on one host; older matrices retain their
+> own dates. Broader boot/relay limits remain explicit. This is not an independent
+> security audit.
 
 **Start here:** [Setup](#setup) · [Daily use](#daily-use) · [Verify](#verify-it-works) · [Troubleshooting](#troubleshooting) · [Maintenance](#maintenance)
 
@@ -255,13 +256,14 @@ The default Compose configuration now mounts a [local-app access policy](LOCAL-A
 that blocks browser-initiated connections to private/local addresses. Local dashboards,
 media servers and other Docker apps are intentionally unavailable inside this browser.
 
-The [current status register](FOLLOW-UP-PLAN.md#current-status-register) tracks all
-remaining packages: retained advisory assessment against exact deployed images
-(R1), maintained local-app policy regression gates (R2), documentation/publication
-consistency (R3), and residual actual host-boot validation (R4). One open boot issue
-does not represent the whole backlog. The [dated exact-image assessment](IMAGE-ASSESSMENT.md) records R1 evidence and
-remaining operator disposition. Next: record that disposition and prepare isolated
-policy regression tests. No reboot or collector rerun is requested.
+The [current status register](FOLLOW-UP-PLAN.md#current-status-register) records
+this completed remediation round: R1 exact-artifact assessment with explicit
+time-bounded retention, R2 installed/published policy gates, R3 consistent
+publication, and R4's [bounded actual-boot guard observation](BOOT-VALIDATION.md).
+No remediation action is carried forward from those four packages. Retained
+findings, untested broader claims and deliberately parked work remain explicit;
+this does not assert zero vulnerabilities or universal boot/relay safety. R1's
+manual reassessment date/triggers remain in force. No new reboot is requested.
 
 The [maintained policy gate](LOCAL-APP-POLICY.md#maintained-policy-acceptance-gate)
 checks mounted source, namespace and active ordered IPv4/IPv6 rules independently
@@ -827,11 +829,12 @@ interchangeable.
 
 ## Changelog
 
-Latest: assessed retained advisories against exact deployed images; residual-risk disposition pending. Expand for dated changes.
+Latest: actual guarded boot evidence and verified recovery complete; retained-image disposition and maintained policy gates recorded. Expand for dated changes.
 
 <details>
-<summary>Release and maintenance history — latest 20 October 2026</summary>
+<summary>Release and maintenance history — latest 21 October 2026</summary>
 
+- 2026-10-21: Completed the selected [actual-boot guard-barrier observation](BOOT-VALIDATION.md) after separate local authorization. Root process/namespace/policy traces plus retained guard messages and boot-clock correlation support startup ordering; network4/4, browser7/7, HTTPS/DNS and viewer/API recovery passed. The original recorder-wide verdict remains INCOMPLETE (late64MiB cap and a post-init independent health sample); the supplementary finding does not turn it into a full15-minute or absent-tunnel packet test. Viewer/updater restored; original images/config/network retained. R1 retention was explicitly accepted through manual reassessment by27October2026 or earlier on the recorded triggers; R2 protected PR40 publication/snapshots are complete. The [status register](FOLLOW-UP-PLAN.md#current-status-register) carries no unfinished R1–R4 action.
 - 2026-10-20: Added a trusted host local-app policy assertion to launch/update/verification and maintained browser/updater paths, plus Compose/checker/wrapper mutations, pinned loader contracts and real isolated dual-stack CI controls. Broken policy cannot inherit PASS from VPN health or browser7/7. FAIL/INCOMPLETE remain distinct through rollback. No Firefox firewall privilege added. See [gate scope and installation](LOCAL-APP-POLICY.md#maintained-policy-acceptance-gate); deployment is a separate recorded stage.
 - 2026-10-20: Assessed retained advisories against read-only archives of the exact deployed Firefox/Gluetun images with a fresh database. Firefox retains 504 observations, including 116 High/Critical package rows across 42 source/advisory groups; Gluetun retains one UNKNOWN and no High/Critical. Recorded scoped absent-feature/browser-mapping evidence and precise applicability blockers, vendor status, owners and manual review triggers. No finding dismissed, risk accepted, image replaced or schedule added. See [assessment and exact-image scan method](IMAGE-ASSESSMENT.md).
 - 2026-10-20: Corrected the introduction to match the deployed private/local-address block, preserving loopback, incoming replies and public-address limits. Consolidated [current remediation status](FOLLOW-UP-PLAN.md#current-status-register): retained advisory assessment, maintained policy regression gates and residual boot validation remain open. Dated runtime observations remain historical; this documentation change does not alter the live stack or certify those remaining packages.

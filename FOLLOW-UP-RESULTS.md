@@ -1,8 +1,10 @@
 # Local forwarding review — 19 October 2026
 
-Current work and next actions are tracked in the
-[status register](FOLLOW-UP-PLAN.md#current-status-register), including advisory
-assessment and maintained policy gates as well as residual boot validation.
+The results below are dated19October. The [current status register](FOLLOW-UP-PLAN.md#current-status-register)
+records the completed R1–R4 remediation round; [BOOT-VALIDATION.md](BOOT-VALIDATION.md)
+separately records the21October guarded boot observation, original INCOMPLETE
+recorder result, supplementary evidence and verified recovery. Older next-action
+text below remains historical.
 
 ## Completed assessment and containment
 
