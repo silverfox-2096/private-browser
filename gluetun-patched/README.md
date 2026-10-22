@@ -1,4 +1,46 @@
-# Patched stable Gluetun candidate — 2026-10-18
+# Patched Gluetun security follow-up — 2026-10-22
+
+The current recipe uses checksum-pinned stable application source, Go 1.27.3,
+and compress 1.18.7. It upgrades Alpine packages and requires PCRE2 10.46-r1
+or newer. This fixes the newly reported x509 certificate-trust advisory
+[CVE-2026-111943 / GO-2026-6809](https://pkg.go.dev/vuln/GO-2026-6809),
+compress CVE-2026-63209, and the eight PCRE2 findings listed in the
+[official Alpine security database](https://secdb.alpinelinux.org/v3.22/main.json).
+Application source and firewall privileges are unchanged. The full dependency
+graph was regenerated with the pinned application source present; the automatic
+manifest-only security PR had removed actual dependencies and was repaired.
+
+Full upstream race tests and authorization/local-policy loader contracts pass.
+Matching-source govulncheck reports only the module-level abandoned OpenPGP
+advisory GO-2026-5932; its affected package is absent from the executable imports.
+The exact rebuilt candidate has no Critical/High/Medium/Low findings with Trivy
+0.76.0/database updated 2026-10-21 13:15 UTC; the one UNKNOWN is retained without
+suppression. The first candidate fixed Go but retained newly reported PCRE2
+findings through a cached runtime layer; that failed scan is preserved and the
+runtime was rebuilt with the explicit fixed-package floor.
+
+These are candidate/source results. The previously approved immutable local
+VPN remains installed until a separately authorized maintenance window validates
+the new VPN/browser/firewall behavior. Existing automatic overrides must remain
+intact until that decision. The ordinary Firefox updater does not adopt this
+build. No reboot is required for a VPN image replacement.
+
+Build/test the recipe with `docker build --target test gluetun-patched`, then
+`docker build --target candidate -t private-gluetun:v3.41.3-pb2 gluetun-patched`.
+Each rebuild needs its own exact-output scan and runtime validation. Roll back a
+future replacement to the preceding reviewed immutable image and override under
+the same closure/lock/maintenance protections; do not substitute the vulnerable
+original upstream image described in the historical record below.
+
+## Historical initial rollout — 2026-10-18
+
+The following dated record describes pb1 and its original assessment, not the
+current recipe or a fresh assessment of that retained output. The new comparison
+finds six High, three Medium, one Low and one UNKNOWN on the retained pb1 artifact;
+the patched candidate removes the six High and all Medium/Low findings. Published
+source, scanned candidates and installed immutable images have separate identities.
+
+### Patched stable Gluetun candidate — 2026-10-18
 
 **Deployed locally with operator approval on 2026-10-18.** The live VPN uses the
 immutable custom image below through an automatic Compose override. Live network
