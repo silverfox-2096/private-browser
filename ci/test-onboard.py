@@ -213,6 +213,23 @@ class Onboard(unittest.TestCase):
         with patch.object(m, 'owned_containers', return_value=[]), patch.object(m, 'port_available'), patch.object(m, 'compose', side_effect=m.Problem('failed build', 1)), patch.object(m, 'run') as run, contextlib.redirect_stdout(io.StringIO()), self.assertRaises(m.Problem): m.start()
         run.assert_not_called()
 
+    def test_compose_mutations_keep_managed_process_protection(self):
+        with patch.object(m, 'run', return_value=Mock(returncode=0)) as run:
+            m.compose('down')
+        self.assertTrue(run.call_args.kwargs['managed'])
+        self.assertEqual(run.call_args.kwargs['env']['COMPOSE_PROJECT_NAME'], m.project_name())
+
+    def test_start_keeps_managed_process_protection(self):
+        self.files()
+        with patch.object(m, 'owned_containers', return_value=['private-firefox']), patch.object(m, 'run', return_value=Mock(returncode=0)) as run, contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(m.start(), 0)
+        self.assertTrue(run.call_args.kwargs['managed'])
+
+    def test_managed_runner_never_accepts_secret_input(self):
+        with patch.object(m, 'managed_process') as process, self.assertRaises(m.Problem):
+            m.run(['command'], data='secret', managed=True)
+        process.assert_not_called()
+
     def test_launch_failure_never_reports_ready(self):
         self.files()
         for rc in (1, 3, 127):

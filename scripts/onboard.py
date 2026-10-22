@@ -39,8 +39,12 @@ class Problem(Exception):
         self.code = code
 
 
-def run(args, *, data=None, timeout=30, env=None):
+def run(args, *, data=None, timeout=30, env=None, managed=False):
     """Capture output; errors never echo arbitrary tool output or input secrets."""
+    if managed:
+        if data is not None:
+            raise Problem('Managed lifecycle commands do not accept secret input.')
+        return subprocess.CompletedProcess(args, managed_process(args, timeout=timeout, env=env), '', '')
     try:
         return subprocess.run(args, cwd=ROOT, input=data, text=True,
                               capture_output=True, timeout=timeout, env=env)
@@ -262,7 +266,7 @@ def compose_environment():
 def compose(*args, timeout=1800):
     result = run(['docker', 'compose', '--project-directory', str(ROOT),
                   '-f', str(ROOT / 'docker-compose.yml'), *args],
-                 timeout=timeout, env=compose_environment())
+                 timeout=timeout, env=compose_environment(), managed=True)
     if result.returncode:
         raise Problem('The build or container operation failed. Your credentials were preserved. Run ./pb doctor; retry ./setup.sh after resolving the cause.', 1)
     return result
@@ -402,10 +406,10 @@ def start(build=False):
     # compose flags here and sanitized environment prevent implicit overrides.
     env = compose_environment()
     env['COMPOSE_FILE'] = str(ROOT / 'docker-compose.yml')
-    result = run(['bash', str(ROOT / 'launch.sh')], timeout=180, env=env)
+    result = run(['bash', str(ROOT / 'launch.sh')], timeout=180, env=env, managed=True)
     if result.returncode:
         code = result.returncode if result.returncode in (1, 3) else 3
-        raise Problem('Readiness or firewall verification did not pass. The browser was not opened. Run ./pb doctor; do not treat this as a successful privacy check.', code)
+        raise Problem('Startup or firewall verification did not complete successfully. Run ./pb doctor; do not treat this as a successful privacy check.', code)
     print('READY: VPN health, browser response and local-app policy passed.\n'
           'Open https://127.0.0.1:7814 and use your browser login.\n'
           'The local HTTPS certificate is self-signed; see QUICKSTART.md.\n'
@@ -413,16 +417,14 @@ def start(build=False):
     return 0
 
 
-def lifecycle(script):
-    """Let existing restoration traps finish after Ctrl+C; never kill them."""
-    env = compose_environment()
-    env['COMPOSE_FILE'] = str(ROOT / 'docker-compose.yml')
+def managed_process(args, *, timeout, env):
+    """Keep the mutation lock and allow child recovery after Ctrl+C/timeouts."""
     try:
-        process = subprocess.Popen(['bash', str(ROOT / script)], cwd=ROOT, env=env,
+        process = subprocess.Popen(args, cwd=ROOT, env=env,
                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                    pass_fds=(() if LOCK_FD is None else (LOCK_FD,)))
         try:
-            process.wait(timeout=1800)
+            process.wait(timeout=timeout)
         except KeyboardInterrupt:
             previous = signal.signal(signal.SIGINT, signal.SIG_IGN)
             try:
@@ -436,6 +438,13 @@ def lifecycle(script):
         return process.returncode
     except subprocess.TimeoutExpired as exc:
         raise Problem('The operation is taking too long and may still be running. It was not killed. Do not start another operation; inspect the original process before recovery.', 3) from exc
+
+
+def lifecycle(script):
+    """Let existing restoration traps finish after Ctrl+C; never kill them."""
+    env = compose_environment()
+    env['COMPOSE_FILE'] = str(ROOT / 'docker-compose.yml')
+    return managed_process(['bash', str(ROOT / script)], timeout=1800, env=env)
 
 
 def status():

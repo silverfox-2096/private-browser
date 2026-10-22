@@ -44,7 +44,9 @@ jobs:
           python3 ci/test-local-app-policy.py
           bash upkeep/test-pba.sh
       - name: Guided setup and private diagnostics regressions
-        run: python3 ci/test-onboard.py
+        run: |
+          python3 ci/test-onboard.py
+          python3 ci/test-release.py
       - name: Module update report failure paths
         run: python3 ci/test-module-updates.py
       - name: checks.mjs verdicts (browser + bash.ws stubbed; runner Node)
