@@ -21,12 +21,13 @@ the VPN and kill switch and jlesage's [GUI base image](https://github.com/jlesag
 for a VNC web UI, with Firefox installed from Mozilla's own APT repository and
 hardened with Firefox's own `resistFingerprinting`.
 
-> Latest follow-up validation: 2026-10-21. The [actual guarded boot observation](BOOT-VALIDATION.md)
+> Latest follow-up validation: 2026-10-22. The [actual guarded boot observation](BOOT-VALIDATION.md)
 > supports the bounded startup-barrier finding; its original recorder-wide INCOMPLETE
 > verdict and supplementary evidence are retained. Network4/4, browser7/7 and policy
 > recovery passed. R1's time-bounded retained-image disposition and R2's installed
 > gates are recorded in the [current status register](FOLLOW-UP-PLAN.md#current-status-register).
-> Published dependency recipes do not replace the pinned live VPN image.
+> The separately approved Go/PCRE2 VPN replacement passed isolated and live checks;
+> future published recipes do not automatically replace its immutable live pin.
 > Baseline runtime/leak review: 2026-09-26, on one host; older matrices retain their
 > own dates. Broader boot/relay limits remain explicit. This is not an independent
 > security audit.
@@ -602,15 +603,16 @@ repository.
 <summary>Patched build and deliberate VPN update process</summary>
 
 Compose now builds Gluetun locally from the exact stable v3.41.3 source, with a
-pinned Go 1.27.2 toolchain, locked patched dependencies and refreshed Alpine
+pinned Go 1.27.3 toolchain, locked patched dependencies and refreshed Alpine
 packages. This replaces the original upstream image's 31 HIGH package findings
 (28 CVEs, zero CRITICAL). Both original and patched scan evidence are retained in
 `gluetun-patched/evidence/`; no vulnerability exclusions were introduced.
 
-The tested patched image has zero CRITICAL/HIGH/MEDIUM/LOW findings and one UNKNOWN
-advisory for an unimported abandoned OpenPGP package. Upstream race tests, isolated
-VPN/browser/firewall tests and an approved local rollout passed (live network
-checks 4/4, browser checks 7/7, control API authentication). CI now builds/tests and
+The 22 October candidate has zero CRITICAL/HIGH/MEDIUM/LOW findings and one UNKNOWN
+advisory for an unimported abandoned OpenPGP package. Upstream race tests pass for the current candidate. The earlier pb1 rollout passed
+isolated VPN/browser/firewall and live network4/4/browser7/7/API checks. The22October candidate also passed separately authorized isolated and live
+network4/4/browser7/7/policy/API checks; its exact image is now retained by the
+automatic override. Source publication alone does not replace installed images. CI now builds/tests and
 scans this same patched recipe as the default VPN image; every CI build has its
 own identity and scan, since Alpine repositories can change.
 
@@ -829,12 +831,13 @@ interchangeable.
 
 ## Changelog
 
-Latest: actual guarded boot evidence and verified recovery complete; retained-image disposition and maintained policy gates recorded. Expand for dated changes.
+Latest: bounded actual-boot evidence/recovery and the approved Go/PCRE2 VPN replacement are complete; retained findings have an explicit disposition. Expand for dated changes.
 
 <details>
-<summary>Release and maintenance history — latest 21 October 2026</summary>
+<summary>Release and maintenance history — latest 22 October 2026</summary>
 
-- 2026-10-21: Completed the selected [actual-boot guard-barrier observation](BOOT-VALIDATION.md) after separate local authorization. Root process/namespace/policy traces plus retained guard messages and boot-clock correlation support startup ordering; network4/4, browser7/7, HTTPS/DNS and viewer/API recovery passed. The original recorder-wide verdict remains INCOMPLETE (late64MiB cap and a post-init independent health sample); the supplementary finding does not turn it into a full15-minute or absent-tunnel packet test. Viewer/updater restored; original images/config/network retained. R1 retention was explicitly accepted through manual reassessment by27October2026 or earlier on the recorded triggers; R2 protected PR40 publication/snapshots are complete. The [status register](FOLLOW-UP-PLAN.md#current-status-register) carries no unfinished R1–R4 action.
+- 2026-10-22: Patched the stable-source VPN recipe to Go1.27.3 and compress1.18.7, repaired the manifest-only dependency update, and required fixed PCRE2>=10.46-r1 after a fresh exact-artifact scan exposed cached runtime findings. Full upstream race/auth/policy contracts and the final candidate scan pass. The separately authorized isolated and live rollout passed network4/4, browser7/7, policy, public HTTPS/DNS, API and viewer recovery; immutable override updated, old image retained for rollback and shared backend/network preserved. See [current candidate versus historical rollout](gluetun-patched/README.md).
+- 2026-10-21: Completed the selected [actual-boot guard-barrier observation](BOOT-VALIDATION.md) after separate local authorization. Root process/namespace/policy traces plus retained guard messages and boot-clock correlation support startup ordering; network4/4, browser7/7, HTTPS/DNS and viewer/API recovery passed. The original recorder-wide verdict remains INCOMPLETE (late64MiB cap and a post-init independent health sample); the supplementary finding does not turn it into a full15-minute or absent-tunnel packet test. Viewer/updater restored; original images/config/network retained. R1 retention was explicitly accepted through manual reassessment by27October2026 or earlier on the recorded triggers; R2 protected PR40 publication/snapshots are complete. R1 subsequently reopened on new vendor-fix triggers; see the22October entry.
 - 2026-10-20: Added a trusted host local-app policy assertion to launch/update/verification and maintained browser/updater paths, plus Compose/checker/wrapper mutations, pinned loader contracts and real isolated dual-stack CI controls. Broken policy cannot inherit PASS from VPN health or browser7/7. FAIL/INCOMPLETE remain distinct through rollback. No Firefox firewall privilege added. See [gate scope and installation](LOCAL-APP-POLICY.md#maintained-policy-acceptance-gate); deployment is a separate recorded stage.
 - 2026-10-20: Assessed retained advisories against read-only archives of the exact deployed Firefox/Gluetun images with a fresh database. Firefox retains 504 observations, including 116 High/Critical package rows across 42 source/advisory groups; Gluetun retains one UNKNOWN and no High/Critical. Recorded scoped absent-feature/browser-mapping evidence and precise applicability blockers, vendor status, owners and manual review triggers. No finding dismissed, risk accepted, image replaced or schedule added. See [assessment and exact-image scan method](IMAGE-ASSESSMENT.md).
 - 2026-10-20: Corrected the introduction to match the deployed private/local-address block, preserving loopback, incoming replies and public-address limits. Consolidated [current remediation status](FOLLOW-UP-PLAN.md#current-status-register): retained advisory assessment, maintained policy regression gates and residual boot validation remain open. Dated runtime observations remain historical; this documentation change does not alter the live stack or certify those remaining packages.

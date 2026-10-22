@@ -1,8 +1,27 @@
 # Retained advisories and exact-image assessment
 
-Assessment date: 20 October 2026. This is a bounded package/path assessment,
+Historical assessment date: 20 October 2026. This is a bounded package/path assessment,
 not an exploit test or acceptance of material residual risk. Findings remain
 visible; no scanner exclusion or alert dismissal was added.
+
+## Follow-up —22October2026
+
+New Go certificate-trust and Alpine PCRE2 vendor fixes triggered the recorded
+manual review condition. A fresh same-database exact-artifact comparison found
+six High, three Medium, one Low and one UNKNOWN on the formerly retained VPN.
+A source-aware Go1.27.3/compress1.18.7/PCRE2>=10.46-r1 rebuild removes all
+Critical/High/Medium/Low findings, retaining only the unimported OpenPGP UNKNOWN.
+Full upstream race/contracts and isolated policy controls pass. The operator
+explicitly approved replacement after disclosure; isolated and live network4/4,
+browser7/7, policy/API/HTTPS/DNS/viewer recovery passed under maintenance. The new
+exact image is pinned; the preceding reviewed image is retained for rollback.
+See the [current recipe and rollout](gluetun-patched/README.md).
+
+Firefox was not replaced or freshly rescanned in this VPN follow-up; its prior
+42-group assessment/disposition remains bounded by27October2026 and the earlier
+review triggers. The table and counts below describe20October artifacts, not a
+new assessment of every current component. Public-source scans and immutable
+local outputs remain separate artifact scopes.
 
 ## Artifact and scan scope
 

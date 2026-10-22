@@ -86,9 +86,14 @@ the authorized recovery held the existing maintenance safeguards and checked:
 
 The viewer is restored, the updater's original enabled/active timer states are
 restored, and the new observer is stopped, disarmed and removed. Its source and
-evidence are retained privately; removal did not restart the browser or VPN. No running image, Compose, policy or startup guard was replaced; no new
+evidence are retained privately; removal did not restart the browser or VPN. During this21October boot/recovery work, no running image, Compose, policy or startup guard was replaced; no new
 recurring collector or timer remains enabled. The old collector was left untouched.
 
 The [current status register](FOLLOW-UP-PLAN.md#current-status-register) records the
 assessment round. Retained advisory findings and the explicit time-bounded R1
 operator disposition are separate from this boot finding.
+
+The separately approved22October [VPN security replacement](gluetun-patched/README.md)
+passed isolated and live runtime controls after this boot observation. It does
+not retroactively change the identities in the21October trace or constitute
+an actual-boot test of the new image. The startup guard/policy are unchanged.
