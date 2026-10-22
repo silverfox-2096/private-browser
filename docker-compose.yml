@@ -10,7 +10,7 @@ services:
     build:
       context: ./gluetun-patched
       target: candidate
-    image: private-gluetun:v3.41.3-pb1
+    image: private-gluetun:v3.41.3-pb2
     pull_policy: never
     container_name: gluetun-proton
     restart: unless-stopped

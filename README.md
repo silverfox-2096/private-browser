@@ -600,15 +600,16 @@ repository.
 <summary>Patched build and deliberate VPN update process</summary>
 
 Compose now builds Gluetun locally from the exact stable v3.41.3 source, with a
-pinned Go 1.27.2 toolchain, locked patched dependencies and refreshed Alpine
+pinned Go 1.27.3 toolchain, locked patched dependencies and refreshed Alpine
 packages. This replaces the original upstream image's 31 HIGH package findings
 (28 CVEs, zero CRITICAL). Both original and patched scan evidence are retained in
 `gluetun-patched/evidence/`; no vulnerability exclusions were introduced.
 
-The tested patched image has zero CRITICAL/HIGH/MEDIUM/LOW findings and one UNKNOWN
-advisory for an unimported abandoned OpenPGP package. Upstream race tests, isolated
-VPN/browser/firewall tests and an approved local rollout passed (live network
-checks 4/4, browser checks 7/7, control API authentication). CI now builds/tests and
+The 22 October candidate has zero CRITICAL/HIGH/MEDIUM/LOW findings and one UNKNOWN
+advisory for an unimported abandoned OpenPGP package. Upstream race tests pass for the current candidate. The earlier pb1 rollout passed
+isolated VPN/browser/firewall and live network4/4/browser7/7/API checks. The new
+candidate still requires a separately authorized live maintenance window; its
+source publication does not replace the retained immutable image. CI now builds/tests and
 scans this same patched recipe as the default VPN image; every CI build has its
 own identity and scan, since Alpine repositories can change.
 
@@ -827,11 +828,12 @@ interchangeable.
 
 ## Changelog
 
-Latest: assessed retained advisories against exact deployed images; residual-risk disposition pending. Expand for dated changes.
+Latest: patched the VPN build for new Go/PCRE2 findings; candidate scan and upstream tests pass, live replacement pending. Expand for dated changes.
 
 <details>
-<summary>Release and maintenance history — latest 20 October 2026</summary>
+<summary>Release and maintenance history — latest 22 October 2026</summary>
 
+- 2026-10-22: Patched the stable-source VPN recipe to Go1.27.3 and compress1.18.7, repaired the manifest-only dependency update, and required fixed PCRE2>=10.46-r1 after a fresh exact-artifact scan exposed cached runtime findings. Full upstream race/auth/policy contracts and the final candidate scan pass. Live immutable override remains unchanged pending explicit rollout authorization. See [current candidate versus historical rollout](gluetun-patched/README.md).
 - 2026-10-20: Added a trusted host local-app policy assertion to launch/update/verification and maintained browser/updater paths, plus Compose/checker/wrapper mutations, pinned loader contracts and real isolated dual-stack CI controls. Broken policy cannot inherit PASS from VPN health or browser7/7. FAIL/INCOMPLETE remain distinct through rollback. No Firefox firewall privilege added. See [gate scope and installation](LOCAL-APP-POLICY.md#maintained-policy-acceptance-gate); deployment is a separate recorded stage.
 - 2026-10-20: Assessed retained advisories against read-only archives of the exact deployed Firefox/Gluetun images with a fresh database. Firefox retains 504 observations, including 116 High/Critical package rows across 42 source/advisory groups; Gluetun retains one UNKNOWN and no High/Critical. Recorded scoped absent-feature/browser-mapping evidence and precise applicability blockers, vendor status, owners and manual review triggers. No finding dismissed, risk accepted, image replaced or schedule added. See [assessment and exact-image scan method](IMAGE-ASSESSMENT.md).
 - 2026-10-20: Corrected the introduction to match the deployed private/local-address block, preserving loopback, incoming replies and public-address limits. Consolidated [current remediation status](FOLLOW-UP-PLAN.md#current-status-register): retained advisory assessment, maintained policy regression gates and residual boot validation remain open. Dated runtime observations remain historical; this documentation change does not alter the live stack or certify those remaining packages.
