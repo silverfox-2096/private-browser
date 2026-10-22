@@ -19,11 +19,18 @@ suppression. The first candidate fixed Go but retained newly reported PCRE2
 findings through a cached runtime layer; that failed scan is preserved and the
 runtime was rebuilt with the explicit fixed-package floor.
 
-These are candidate/source results. The previously approved immutable local
-VPN remains installed until a separately authorized maintenance window validates
-the new VPN/browser/firewall behavior. Existing automatic overrides must remain
-intact until that decision. The ordinary Firefox updater does not adopt this
-build. No reboot is required for a VPN image replacement.
+The operator separately approved the reviewed exact candidate and closed every
+viewer. On22October, under updater lock and503/zero-viewer maintenance admission,
+the production VPN stopped before the isolated candidate used the account keys.
+Isolated network4/4, browser7/7, policy and API401/200 passed; that project was
+removed before production adoption. The exact new output then passed live
+network4/4, browser7/7, public HTTPS/DNS, policy, API401/200 and viewer302/login
+recovery. Shared network/backend and optional-service state were preserved.
+The automatic override now retains that reviewed output with pull_policy:never;
+the preceding reviewed image/override remain available for rollback. No reboot
+or root installation occurred. One UNKNOWN remains with the disclosed absent
+OpenPGP import; unchanged Firefox findings retain the prior bounded disposition.
+Every later candidate needs its own review; source publication is not deployment.
 
 Build/test the recipe with `docker build --target test gluetun-patched`, then
 `docker build --target candidate -t private-gluetun:v3.41.3-pb2 gluetun-patched`.
