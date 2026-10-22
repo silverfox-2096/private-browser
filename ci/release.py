@@ -117,7 +117,7 @@ def check_source_files(archive, prefix):
                  'verify.sh', 'probe/checks.sh', 'ci/checks.mjs', 'ci/creep-baseline.json',
                  'Dockerfile.firefox', 'gluetun-patched/Dockerfile', 'gluetun-patched/go.mod',
                  'gluetun-patched/go.sum', '.env.example', 'QUICKSTART.md', 'VALIDATION.md',
-                 'RELEASING.md', 'LICENSE'}
+                 'RELEASING.md', 'LICENSE', 'scripts/release_mode.py', 'ci/release.py'}
     names, all_paths = set(), set()
     with tarfile.open(fileobj=io.BytesIO(archive), mode='r:') as source:
         for member in source:
@@ -135,13 +135,16 @@ def check_source_files(archive, prefix):
             require(not any(part in ('.git', '.env', 'webauth-htpasswd', 'gluetun', 'creepjs',
                                      '.private-browser-release') for part in relative.parts),
                     'source archive contains private runtime files')
-            require(not any(part.startswith(('.pb-secret-', '.env', 'webauth-htpasswd')) and part != '.env.example'
+            require(not any(part.startswith(('.pb-secret-', '.pb-release', '.env', 'webauth-htpasswd')) and part != '.env.example'
                             for part in relative.parts), 'source archive contains a potential credential backup')
+            require(str(relative) != 'docker-compose.release.yml', 'source archive contains an installed release selection')
             require(not (relative.suffix in ('.key', '.pem', '.p12', '.pfx', '.ovpn')
                          or str(relative).endswith('.conf.wg')
                          or (relative.suffix == '.conf' and str(relative) not in ('maintenance.conf', 'nginx-8080.conf'))),
                     'source archive contains a potential private provider/credential file')
             if member.isfile():
+                if str(relative) in ('setup.sh', 'pb', 'launch.sh', 'update.sh', 'verify.sh'):
+                    require(member.mode & 0o111 != 0, 'source archive lost an executable entry point')
                 require(str(relative) not in names, 'duplicate source archive file')
                 names.add(str(relative))
         require(essential <= names, 'source archive lacks required runtime files')
@@ -189,8 +192,9 @@ def notes(manifest):
             'selects prebuilt VPN/Firefox images while retaining the source policy,\n'
             'startup, login and maintenance mounts. The optional CreepJS image is\n'
             'still source-built. This tooling does not install or update a running\n'
-            'stack. Release-aware installation, update and rollback acceptance must\n'
-            'be complete before advertising this bundle to end users.\n').encode()
+            'stack. The guided CLI supports compatible-controller release selection,\n'
+            'update and rollback; actual deployment acceptance must be complete\n'
+            'before advertising this bundle to end users.\n').encode()
 
 
 def prepare(manifest_path, evidence_path, output):

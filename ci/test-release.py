@@ -211,6 +211,15 @@ class ReleaseTests(unittest.TestCase):
         self.manifest_path.write_text('{"schema":1,"schema":2}')
         with self.assertRaises(m.Invalid): m.read_json(self.manifest_path)
 
+    def test_source_archive_preserves_executable_entry_points(self):
+        valid = m.git('archive', '--format=tar', '--prefix=source/', self.manifest['source'])
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=io.BytesIO(valid), mode='r:') as original, tarfile.open(fileobj=buf, mode='w') as target:
+            for entry in original:
+                if entry.name == 'source/setup.sh': entry.mode = 0o644
+                target.addfile(entry, original.extractfile(entry) if entry.isfile() else None)
+        with self.assertRaises(m.Invalid): m.check_source_files(buf.getvalue(), 'source')
+
     def test_unknown_compose_layout_refused(self):
         original = m.git('show', self.manifest['source'] + ':docker-compose.yml')
         with self.assertRaises(m.Invalid): m.compose_recipe(original.replace(b'    build:\n', b'    build: ./other\n', 1), self.manifest['images'])

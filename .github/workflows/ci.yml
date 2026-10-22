@@ -47,6 +47,7 @@ jobs:
         run: |
           python3 ci/test-onboard.py
           python3 ci/test-release.py
+          python3 ci/test-release-mode.py
       - name: Module update report failure paths
         run: python3 ci/test-module-updates.py
       - name: checks.mjs verdicts (browser + bash.ws stubbed; runner Node)

@@ -216,14 +216,14 @@ class Onboard(unittest.TestCase):
     def test_compose_mutations_keep_managed_process_protection(self):
         with patch.object(m, 'run', return_value=Mock(returncode=0)) as run:
             m.compose('down')
-        self.assertTrue(run.call_args.kwargs['managed'])
+        self.assertTrue(run.call_args_list[0].kwargs['managed'])
         self.assertEqual(run.call_args.kwargs['env']['COMPOSE_PROJECT_NAME'], m.project_name())
 
     def test_start_keeps_managed_process_protection(self):
         self.files()
         with patch.object(m, 'owned_containers', return_value=['private-firefox']), patch.object(m, 'run', return_value=Mock(returncode=0)) as run, contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(m.start(), 0)
-        self.assertTrue(run.call_args.kwargs['managed'])
+        self.assertTrue(run.call_args_list[0].kwargs['managed'])
 
     def test_managed_runner_never_accepts_secret_input(self):
         with patch.object(m, 'managed_process') as process, self.assertRaises(m.Problem):

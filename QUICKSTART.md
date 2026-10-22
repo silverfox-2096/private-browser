@@ -112,6 +112,16 @@ and browser login survive so that you can start again. Closing only the viewer
 window is different from stopping the stack. Host-side viewer/clipboard traces
 are outside the browser profile's RAM-only promise.
 
+## Prebuilt release preview
+
+A local prebuilt-bundle path is implemented, but real installation/update/rollback
+acceptance and publication are still pending. There is no published release to
+download yet. Once a reviewed release is available, use its matching source and
+`./setup.sh --release /absolute/path/to/bundle`. Existing credentials are preserved.
+Pinned installations update with `./pb update --release /absolute/path/to/bundle`
+and can use `./pb rollback` after saving work and closing the viewer. Source
+installations continue using the commands above. See [release limits and recovery](RELEASING.md#guided-prebuilt-installation-updates-and-rollback).
+
 ## If something goes wrong
 
 - **Docker cannot be reached:** start Docker and verify that your normal account
@@ -132,13 +142,15 @@ are outside the browser profile's RAM-only promise.
   continue using the manual guide. There is no automatic credential reset.
 - **Maintenance gate is active:** finish the operation that owns it. Follow the
   [maintenance recovery guide](README.md#maintenance-window); never blindly clear
-  a gate while an update is running.
+  a gate while an update is running. For an interrupted release transition, close
+  the viewer and use `./pb rollback` after any running command finishes; preserve
+  the gate and transaction if recovery remains INCOMPLETE.
 - **VPN readiness or policy did not pass:** avoid browsing; run `./pb doctor`.
   Check provider selection, country availability and whether the WireGuard config
   is valid and unused elsewhere. A healthy status alone is not a leak-test pass.
 - **A lifecycle command was interrupted:** allow restoration to finish. Do not
-  immediately launch another operation. The wrapper waits for the existing
-  verification recovery trap instead of killing it.
+  immediately launch another operation. The wrapper keeps its operation lock while child work continues and waits for
+  existing recovery steps instead of killing a mutating command.
 
 Doctor does not collect logs, resolved Compose configuration, IP addresses,
 provider files, passwords or browser data. Share only its reviewed textual output.

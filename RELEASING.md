@@ -1,6 +1,6 @@
 # Versioned distribution and rollback
 
-Status22October2026: offline packaging/verification implemented; no prebuilt release is published.
+Status22October2026: offline packaging and compatible-controller release lifecycle implemented; no prebuilt release is published.
 The default remains local source builds. Never advertise a tag or digest before
 its exact artifacts have passed the declared checks.
 
@@ -47,7 +47,7 @@ obtain a package. The regression tests use explicitly synthetic records only.
 identity, signatures or a GitHub attestation.** Review the actual reports and
 provenance before generating records; hashes alone cannot prove a test occurred.
 Checksums sent with a bundle do not establish authenticity. Registry publication,
-publisher authentication, release-aware installation/update/rollback, and real
+publisher authentication and real installation/update/rollback
 acceptance remain required before distribution to end users. No existing release
 or registry digest is implied by the schema's expected repository names.
 
@@ -93,18 +93,81 @@ materials/snapshots in the release build process before claiming that property.
   and existing security gates. Never embed provider keys, login hashes or raw
   private captures in archives, images, provenance or release assets.
 
-## Updates and rollback
+## Guided prebuilt installation, updates and rollback
 
-The existing manual updater rebuilds Firefox from source and does not implement a
-prebuilt release update. Do not route release users through it without adding and
-testing an explicit release-aware path.
+The CLI has a prebuilt path, tested with simulated Docker/VPN operations and real
+filesystem transitions. It is not yet validated on a clean real-VPN installation.
+No release bundle is currently advertised or published. Source installation stays
+the normal quick-start until the actual acceptance and publication gates pass.
 
-A release update must retain the prior manifest/digests and local credential files,
-close the viewer, use the maintained maintenance/viewer checks, install the new
-manifest and verify readiness, policy and network/browser recovery. A failed or
-INCOMPLETE acceptance restores the previous images/configuration and verifies
-recovery before clearing maintenance. Only report UPDATED after success. Rollback
-restores software; browser-session data erased by a restart is not recoverable.
+Use an authenticated, reviewed bundle and the matching controller source from its
+`source.tar.gz`. Verify its publisher/provenance separately; the local verifier
+checks consistency and integrity only. The guided installer compares executable
+controller/configuration/pin files against the frozen source before selecting the
+bundle. It does not execute or extract code from the bundle automatically.
 
-Do not promise unattended VPN updates. Existing live immutable pins, overrides and
-accepted dispositions remain separate from public release assets.
+```bash
+./setup.sh --release /absolute/path/to/reviewed-bundle
+# Or save the credentials and release selection without downloads or startup:
+./setup.sh --configure-only --release /absolute/path/to/reviewed-bundle
+./pb start
+
+# Close the viewer and save work before either transition:
+./pb update --release /absolute/path/to/new-reviewed-bundle
+./pb rollback
+```
+
+This first lifecycle supports image updates with compatible controller files.
+It refuses executable/controller changes and requires a separate reviewed source
+migration for those changes. It preserves a running source installation instead
+of silently converting it. Docs may be annotated, but controller files and pins
+must remain as reviewed. The usual fixed names permit one installation per engine.
+
+The installer privately records `.pb-release.json` and
+`docker-compose.release.yml`; these are local state, excluded from Git and builds.
+Rerunning the same selection preserves it. A recipe-only interrupted selection
+can be completed by rerunning setup with the same bundle; it cannot silently
+fall back to source building. Starts reuse available immutable images and pull
+missing Linux/amd64 images, verify actual running image identities and the normal
+login redirect, then open the browser. Ordinary `./pb update` refuses to rebuild
+a pinned installation: supply the next bundle explicitly.
+
+A release update downloads missing images before maintenance. It verifies this
+checkout's container ownership, creates the maintenance gate, checks the mounted
+flag/nginx include and actual HTTP503 response, then requires independently
+readable IPv4 and IPv6 socket tables with zero connected viewers. A nonzero or
+unreadable observation aborts before container recreation. It records prior
+immutable image IDs, selected metadata and optional-service running state in a
+private `.pb-release-transaction.json` before changing the selection.
+
+The transition recreates the namespace-sharing services with the original policy,
+startup/login/maintenance mounts, confirms exact images/readiness, runs the
+maintained policy and disruptive network verifier, and restores the optional
+service's running state. Only then does it clear its own gate and require the
+normal unauthenticated HTTP302 login redirect. A missing redirect re-enables
+maintenance and retains the transaction instead of reporting UPDATED. Browser
+WebRTC/DNS page checks remain separate; installed network checks do not claim
+seven browser results or a new actual-boot observation.
+
+FAIL, INCOMPLETE or interruption triggers restoration of the previous selection,
+images and verified policy/network/login recovery. The original unsuccessful
+verdict remains unsuccessful after verified rollback. Failed recovery retains
+maintenance and the transaction and reports INCOMPLETE. `./pb rollback` can retry
+that recorded recovery after the viewer is closed, including when the failed
+transition removed the viewer container. If an operation times out but its child
+is still running, no competing rollback is started: the child keeps the operation
+lock, and recovery must wait until it finishes. Do not bypass the lock.
+
+Without an interrupted transaction, `./pb rollback` selects the recorded previous
+compatible release under the same admission and recovery controls. Credentials
+are never replaced by a transition. Software rollback does not restore erased
+browser-session data. Keep prior accepted images available; do not prune them
+before acceptance. Missing/malformed metadata, changed gate ownership, changed
+controller files or foreign container ownership require manual review rather
+than guessing which services or files to replace. Never blindly delete the gate
+or transaction file to force an operation through.
+
+The existing source updater remains separate. No scheduler, unattended VPN update,
+production migration, registry upload or release publication is added by these
+commands. The release lifecycle tests use nonexistent image references and
+synthetic receipts, not actual deployment success.

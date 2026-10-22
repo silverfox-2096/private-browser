@@ -53,3 +53,7 @@ scripts/
 *.ovpn
 *.conf
 !maintenance.conf
+
+# Local prebuilt release selection and interrupted transition journal
+.pb-release*.json
+docker-compose.release.yml

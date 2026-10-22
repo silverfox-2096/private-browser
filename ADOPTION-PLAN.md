@@ -68,7 +68,7 @@ reporting. Never publish credentials or raw private runtime evidence.
 - Guided setup, local credential handling and scoped daily commands: IMPLEMENTED,
   awaiting complete installation acceptance. The initial wizard targets Proton
   on Linux x86-64; other providers/platforms remain manual/unvalidated.
-- Automated onboarding controls: PASS40; maintained scripts PASS74; policy and
+- Automated onboarding controls: PASS40; maintained scripts PASS75; policy and
   Compose mutations PASS; real pinned helper accepts/rejects synthetic passwords.
 - Quick-start, validation summary and synthetic configuration-only prompt
   recording: CREATED. The recording simulates discovery/port checks and is not
@@ -77,10 +77,16 @@ reporting. Never publish credentials or raw private runtime evidence.
   self-signed certificate warning. No warning was bypassed automatically.
 - Deliverable6: offline candidate packaging/consistency verification IMPLEMENTED,
   including digest-pinned Compose, frozen source archive, evidence/provenance
-  records and checksums. PASS16 packaging/mutation/Compose-equivalence tests.
+  records and checksums. PASS17 packaging/mutation/Compose-equivalence tests.
   These check receipt consistency, not report truth or publisher authenticity.
-  Real exact-artifact release acceptance, authenticated publication, binary-build
-  reproducibility and release-aware installation/update/rollback remain NOT COMPLETE.
+  Compatible-controller release selection/start/update/rollback and interrupted
+  recovery are IMPLEMENTED with PASS33 isolated lifecycle tests. Actual image
+  identity, maintenance/viewer admission, rollback verdict preservation, live-child
+  timeout handling and credential preservation are covered by simulated Docker
+  operations plus real private state files. No real release acceptance is inferred.
+  Real exact-artifact deployment acceptance, authenticated publication and
+  reproducible binary build materials remain NOT COMPLETE. Controller-source
+  migration is explicitly separate from supported compatible image updates.
 - Real clean-host / unfamiliar-user acceptance and measurements: NOT RUN. A
   separate unused VPN config and disposable supported host have been requested.
 - Production installation: UNCHANGED; guided setup's foreign-container refusal

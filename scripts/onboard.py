@@ -7,6 +7,7 @@ import contextlib
 import fcntl
 import getpass
 import hashlib
+import importlib.util
 import ipaddress
 import json
 import os
@@ -21,6 +22,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parent.parent
 NAMES = ('gluetun-proton', 'private-firefox', 'creepjs-server')
@@ -33,10 +35,28 @@ def project_name():
     return 'private-browser-' + hashlib.sha256(str(ROOT).encode()).hexdigest()[:12]
 
 
+def releases():
+    spec = importlib.util.spec_from_file_location('pb_release_mode', ROOT / 'scripts' / 'release_mode.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.Releases(SimpleNamespace(**globals()))
+
+
+def compose_path():
+    if any(path.exists() or path.is_symlink() for path in (ROOT / '.pb-release.json', ROOT / 'docker-compose.release.yml')):
+        releases().state()
+        return ROOT / 'docker-compose.release.yml'
+    return ROOT / 'docker-compose.yml'
+
+
 class Problem(Exception):
     def __init__(self, message, code=2):
         super().__init__(message)
         self.code = code
+
+
+class OperationRunning(Problem):
+    """A mutating child is still live and retains the operation lock."""
 
 
 def run(args, *, data=None, timeout=30, env=None, managed=False):
@@ -223,7 +243,7 @@ def login_exists():
     return True
 
 
-def owned_containers():
+def owned_containers(expected_recipe=None):
     """Inspect labels only; no Config.Env, logs or credentials in diagnostics."""
     names = set(docker('ps', '-a', '--format', '{{.Names}}').splitlines())
     owned = []
@@ -238,7 +258,7 @@ def owned_containers():
             raise Problem('Container ownership could not be read; no changes made.', 3)
         workdir = labels.get('com.docker.compose.project.working_dir', '')
         configs = labels.get('com.docker.compose.project.config_files', '')
-        if (workdir != str(ROOT) or configs != str(ROOT / 'docker-compose.yml')
+        if (workdir != str(ROOT) or configs != str(expected_recipe or compose_path())
                 or labels.get('com.docker.compose.project') != project_name()):
             raise Problem('An existing Private Browser container belongs to another checkout or uses overrides. No changes made; use its original installation.')
         owned.append(name)
@@ -265,10 +285,10 @@ def compose_environment():
 
 def compose(*args, timeout=1800):
     result = run(['docker', 'compose', '--project-directory', str(ROOT),
-                  '-f', str(ROOT / 'docker-compose.yml'), *args],
+                  '-f', str(compose_path()), *args],
                  timeout=timeout, env=compose_environment(), managed=True)
     if result.returncode:
-        raise Problem('The build or container operation failed. Your credentials were preserved. Run ./pb doctor; retry ./setup.sh after resolving the cause.', 1)
+        raise Problem('The build or container operation failed. Your credentials were preserved. Run ./pb doctor; retry ./setup.sh after resolving the cause.', result.returncode if result.returncode in (3, 130) else 1)
     return result
 
 
@@ -327,7 +347,7 @@ def hash_password(username, password):
     return result.stdout.strip() + '\n'
 
 
-def setup(configure_only=False):
+def setup(configure_only=False, release_bundle=None):
     prerequisites()
     owned = owned_containers()
     if (ROOT / 'maintenance' / 'active').exists():
@@ -340,6 +360,8 @@ def setup(configure_only=False):
             raise Problem('This installation already has containers but its login file is missing; restore it before continuing.')
         print('Existing installation preserved. Use ./pb status or ./pb doctor; setup did not restart it.')
         return 0
+    if release_bundle is not None:
+        releases().candidate(release_bundle)
     port_available()
     values = environment()
     has_login = login_exists()
@@ -378,6 +400,8 @@ def setup(configure_only=False):
         del password, again
     for name, content in pending.items():
         create_private(ROOT / name, content)
+    if release_bundle is not None:
+        releases().stage(release_bundle)
     print('Local configuration is ready. Existing credentials were preserved.', flush=True)
     if configure_only:
         print('Nothing was built or started. Next: ./pb start')
@@ -396,25 +420,45 @@ def start(build=False):
         raise Problem('Private Browser is under maintenance. See the recovery guide before changing the gate.')
     if not owned:
         port_available()
-    print('Building images. Progress is captured locally; credentials are never printed.', flush=True)
+    release = releases() if (ROOT / '.pb-release.json').exists() else None
+    identities = None
+    if release:
+        print('Preparing the selected immutable release images…', flush=True)
+        identities = release.pull(release.state()['active'])
+    else:
+        print('Building images. Progress is captured locally; credentials are never printed.', flush=True)
     # Initial build explicitly includes the locally patched VPN, whose pull policy
     # is never. On subsequent starts Compose reuses existing images.
-    if build or not owned:
+    if not release and (build or not owned):
         compose('build', 'gluetun', 'firefox')
     print('Starting and checking the VPN, browser and firewall policy…', flush=True)
     # Existing launch.sh owns readiness and trusted policy verdicts. Explicit
     # compose flags here and sanitized environment prevent implicit overrides.
     env = compose_environment()
-    env['COMPOSE_FILE'] = str(ROOT / 'docker-compose.yml')
+    env['COMPOSE_FILE'] = str(compose_path())
+    env['PB_NO_OPEN'] = '1'
     result = run(['bash', str(ROOT / 'launch.sh')], timeout=180, env=env, managed=True)
     if result.returncode:
         code = result.returncode if result.returncode in (1, 3) else 3
         raise Problem('Startup or firewall verification did not complete successfully. Run ./pb doctor; do not treat this as a successful privacy check.', code)
+    if release:
+        release.assert_images(identities)
+        if release.http_status() != '302':
+            raise Problem('The release login redirect did not verify. The browser was not opened; run ./pb doctor and review RELEASING.md.', 3)
+    open_browser()
     print('READY: VPN health, browser response and local-app policy passed.\n'
           'Open https://127.0.0.1:7814 and use your browser login.\n'
           'The local HTTPS certificate is self-signed; see QUICKSTART.md.\n'
           'Real-VPN leak verification is separate: save your work, close the viewer, then ./pb verify.')
     return 0
+
+
+def open_browser():
+    if shutil.which('xdg-open'):
+        try:
+            run(['xdg-open', 'https://127.0.0.1:7814'], timeout=10)
+        except Problem:
+            pass  # Readiness succeeded; the printed URL remains usable.
 
 
 def managed_process(args, *, timeout, env):
@@ -437,13 +481,13 @@ def managed_process(args, *, timeout, env):
             return 130
         return process.returncode
     except subprocess.TimeoutExpired as exc:
-        raise Problem('The operation is taking too long and may still be running. It was not killed. Do not start another operation; inspect the original process before recovery.', 3) from exc
+        raise OperationRunning('The operation is taking too long and may still be running. It was not killed. Do not start another operation; inspect the original process before recovery.', 3) from exc
 
 
 def lifecycle(script):
     """Let existing restoration traps finish after Ctrl+C; never kill them."""
     env = compose_environment()
-    env['COMPOSE_FILE'] = str(ROOT / 'docker-compose.yml')
+    env['COMPOSE_FILE'] = str(compose_path())
     return managed_process(['bash', str(ROOT / script)], timeout=1800, env=env)
 
 
@@ -468,6 +512,8 @@ def doctor():
     if not environment() or not login_exists():
         raise Problem('Setup is incomplete. Run ./setup.sh first.')
     print('PASS: private configuration and bcrypt login are present (contents hidden).')
+    if (ROOT / '.pb-release-transaction.json').exists() or (ROOT / '.pb-release-transaction.json').is_symlink():
+        raise Problem('A release transaction needs recovery. Let any running operation finish, close the viewer, then use ./pb rollback.', 3)
     if (ROOT / 'maintenance' / 'active').exists():
         raise Problem('Maintenance gate is active. See QUICKSTART.md before recovery.', 3)
     owned = owned_containers()
@@ -486,11 +532,14 @@ def doctor():
 
 def main():
     parser = argparse.ArgumentParser(description='Private Browser: setup, daily commands and private diagnostics.')
-    parser.add_argument('command', choices=('setup', 'start', 'status', 'doctor', 'stop', 'update', 'verify'))
+    parser.add_argument('command', choices=('setup', 'start', 'status', 'doctor', 'stop', 'update', 'verify', 'rollback'))
     parser.add_argument('--configure-only', action='store_true', help='setup: save credentials without building or starting')
+    parser.add_argument('--release', type=Path, help='setup/update: local verified prebuilt release bundle (publisher/provenance must be reviewed)')
     args = parser.parse_args()
     if args.configure_only and args.command != 'setup':
         parser.error('--configure-only is only valid with setup')
+    if args.release is not None and args.command not in ('setup', 'update'):
+        parser.error('--release is only valid with setup or update')
     try:
         if args.command == 'status':
             prerequisites()
@@ -498,9 +547,18 @@ def main():
         if args.command == 'doctor':
             return doctor()
         with setup_lock():
+            if ((ROOT / '.pb-release-transaction.json').exists() or (ROOT / '.pb-release-transaction.json').is_symlink()) and args.command != 'rollback':
+                raise Problem('A release transition is incomplete. Preserve maintenance and run ./pb rollback after closing the viewer.')
             if args.command == 'setup':
-                return setup(args.configure_only)
+                return setup(args.configure_only, args.release)
             prerequisites()
+            if args.command == 'rollback':
+                if not environment() or not login_exists():
+                    raise Problem('Restore the original private configuration before rollback.')
+                if not confirm('Have you saved your work and closed the viewer? Rollback restarts the browser and erases its current session.'):
+                    print('Cancelled. Nothing changed.')
+                    return 0
+                return releases().recover()
             if args.command == 'start':
                 return start()
             owned = owned_containers()
@@ -516,6 +574,10 @@ def main():
             if not confirm(message):
                 print('Cancelled. Nothing changed.')
                 return 0
+            if args.command == 'update' and args.release is not None:
+                return releases().update(args.release)
+            if args.command == 'update' and (ROOT / '.pb-release.json').exists():
+                raise Problem('This is a pinned release installation. Use ./pb update --release BUNDLE; source rebuilding was refused.')
             if args.command == 'stop':
                 compose('down', timeout=180)
                 print('STOPPED. The browser session was erased; local VPN and login credentials were preserved.')

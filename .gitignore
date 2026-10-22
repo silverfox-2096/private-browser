@@ -24,3 +24,7 @@ __pycache__/
 *.conf.wg
 *.conf
 *.ovpn
+
+# Local prebuilt release selection and interrupted transition journal
+.pb-release*.json
+docker-compose.release.yml

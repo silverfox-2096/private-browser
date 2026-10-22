@@ -97,7 +97,10 @@ take over another installation. Clean-machine acceptance is still pending; see
 
 Guided installations can use `./pb start`, `./pb status`, `./pb doctor`,
 `./pb stop`, `./pb update` and `./pb verify`; see [command behavior and recovery](QUICKSTART.md#everyday-commands).
-Existing manual installations keep using the commands below.
+Existing manual installations keep using the commands below. The
+[prebuilt release preview](RELEASING.md#guided-prebuilt-installation-updates-and-rollback)
+has separate bundle/update/rollback commands and still awaits real deployment
+acceptance; no prebuilt release is published.
 
 Start the stack with `./launch.sh` and stop it with `docker compose down`. Stopping
 wipes the whole profile (bookmarks, logins, history, cookies, and downloads) by
