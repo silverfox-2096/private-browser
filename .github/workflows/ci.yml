@@ -35,7 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
       - name: ShellCheck (preinstalled on the runner)
-        run: shellcheck launch.sh update.sh verify.sh startup-guard.sh gluetun-patched/update-module.sh ci/fingerprint.sh ci/test-scripts.sh probe/checks.sh upkeep/pb-autoupdate.sh upkeep/test-pba.sh
+        run: shellcheck setup.sh pb launch.sh update.sh verify.sh startup-guard.sh gluetun-patched/update-module.sh ci/fingerprint.sh ci/test-scripts.sh probe/checks.sh upkeep/pb-autoupdate.sh upkeep/test-pba.sh
       - name: Failure-path tests (docker/curl stubbed; no stack, no network)
         run: bash ci/test-scripts.sh
       - name: Local policy assertions and updater/wrapper verdicts
@@ -43,6 +43,8 @@ jobs:
           python3 ci/check-policy-compose.py
           python3 ci/test-local-app-policy.py
           bash upkeep/test-pba.sh
+      - name: Guided setup and private diagnostics regressions
+        run: python3 ci/test-onboard.py
       - name: Module update report failure paths
         run: python3 ci/test-module-updates.py
       - name: checks.mjs verdicts (browser + bash.ws stubbed; runner Node)

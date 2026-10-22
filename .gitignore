@@ -17,3 +17,10 @@ maintenance/active
 
 __pycache__/
 *.pyc
+
+# Local setup locking, interrupted secret writes, and provider configuration
+.pb-setup.lock
+.pb-secret-*
+*.conf.wg
+*.conf
+*.ovpn

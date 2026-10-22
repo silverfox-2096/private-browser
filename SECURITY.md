@@ -6,7 +6,7 @@
 |---|---|---|
 | [Code scanning alerts](https://github.com/silverfox-2096/private-browser/security/code-scanning) | Trivy's full Firefox image findings, including unfixed and lower-severity findings | Sign in with repository alert access; the anonymous public view does not show the owner's alert list |
 | [Main CI workflow](https://github.com/silverfox-2096/private-browser/actions/workflows/ci.yml) | Firefox image scan, configuration/script checks and isolated fingerprint/startup tests | Public workflow/job summaries; artifact downloads may require sign-in |
-| [Companion image workflow](https://github.com/silverfox-2096/private-browser/actions/workflows/companion-images.yml) | Patched Gluetun and optional CreepJS build/scan results, full JSON artifacts, source-aware module report | Public workflow/job summaries; artifact downloads may require sign-in |
+| [Companion image workflow](https://github.com/silverfox-2096/private-browser/actions/workflows/companion-images.yml) | Patched Gluetun, optional CreepJS and pinned login-helper build/scan results, full JSON artifacts, source-aware module report | Public workflow/job summaries; artifact downloads may require sign-in |
 | [Dependabot alerts](https://github.com/silverfox-2096/private-browser/security/dependabot) | GitHub's supported dependency-advisory matches | Sign in with repository alert access; a newly enabled scan may need indexing time |
 
 GitHub restricts security alert visibility even for public repositories. See

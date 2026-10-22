@@ -42,3 +42,14 @@ upkeep/
 
 __pycache__/
 *.pyc
+
+# Guided onboarding is host-only; provider files and temporary secrets stay local.
+setup.sh
+pb
+scripts/
+.pb-setup.lock
+.pb-secret-*
+*.conf.wg
+*.ovpn
+*.conf
+!maintenance.conf
