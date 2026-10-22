@@ -58,6 +58,10 @@ materials/snapshots in the release build process before claiming that property.
 
 ## Candidate acceptance
 
+Use the [installation and usability worksheet](ADOPTION-TRIAL.md) to record real
+observations, resource measurement methods, coaching and retained failed attempts.
+Its blank fields are not evidence and cannot substitute for reviewed reports.
+
 1. Select a reviewed source commit after the protected CI/companion checks pass.
    Record OS/architecture, source revision, toolchain, observed build inputs,
    Firefox/package versions and image identities. Build the patched VPN's `test`

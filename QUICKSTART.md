@@ -174,3 +174,6 @@ timing and first-time-user acceptance remain tracked in
 [ADOPTION-PLAN.md](ADOPTION-PLAN.md). The local browser's self-signed certificate
 warning requires a human to continue before UI capture. No mock image is
 presented as a working VPN deployment.
+
+Facilitators can use the [first-installation trial worksheet](ADOPTION-TRIAL.md)
+to record timings, resource measurements and points where a new user needs help.

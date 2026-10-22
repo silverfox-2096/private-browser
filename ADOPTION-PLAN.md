@@ -89,6 +89,8 @@ reporting. Never publish credentials or raw private runtime evidence.
   migration is explicitly separate from supported compatible image updates.
 - Real clean-host / unfamiliar-user acceptance and measurements: NOT RUN. A
   separate unused VPN config and disposable supported host have been requested.
+  [Trial worksheet](ADOPTION-TRIAL.md) records the procedure and blank fields;
+  no passing runtime or usability observations are implied.
 - Production installation: UNCHANGED; guided setup's foreign-container refusal
   was verified without reading its credentials or changing services.
 - Draft publication and protected CI: next checkpoint records PR/exact revision.
