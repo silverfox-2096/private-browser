@@ -80,7 +80,7 @@ reporting. Never publish credentials or raw private runtime evidence.
   records and checksums. PASS17 packaging/mutation/Compose-equivalence tests.
   These check receipt consistency, not report truth or publisher authenticity.
   Compatible-controller release selection/start/update/rollback and interrupted
-  recovery are IMPLEMENTED with PASS33 isolated lifecycle tests. Actual image
+  recovery are IMPLEMENTED with PASS34 isolated lifecycle tests. Actual image
   identity, maintenance/viewer admission, rollback verdict preservation, live-child
   timeout handling and credential preservation are covered by simulated Docker
   operations plus real private state files. No real release acceptance is inferred.

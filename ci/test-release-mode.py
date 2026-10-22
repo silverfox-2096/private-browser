@@ -42,7 +42,7 @@ class ReleaseMode(unittest.TestCase):
         self.release = mode.Releases(self.api)
         self.calls = []; self.optional = False; self.running = True
         self.sockets = {'/proc/net/tcp': 'sl local_address rem_address st\n0: 00000000:16A8 00000000:0000 0A\n',
-                        '/proc/net/tcp6': 'sl local_address rem_address st\n0: 00000000000000000000000000000000:16A8 00000000000000000000000000000000:0000 0A\n'}
+                        '/proc/net/tcp6': 'sl local_address remote_address st\n0: 00000000000000000000000000000000:16A8 00000000000000000000000000000000:0000 0A\n'}
         self.network_results = []; self.policy_results = []; self.compose_failures = []
         self.http = None; self.after_status = '302'; self.owner_error = False; self.pull_error = False
         self.old_bundle = self.bundle('v0.0.0-rc.1', ('a', 'b'))
@@ -406,6 +406,17 @@ class ReleaseMode(unittest.TestCase):
         self.after_status = '302'
         with contextlib.redirect_stdout(io.StringIO()): self.assertEqual(self.release.recover(), 0)
         self.assertEqual(self.release.state(), self.old)
+
+    def test_parser_accepts_actual_kernel_tcp4_and_tcp6_headers(self):
+        for name, address in (('tcp', '00000000'), ('tcp6', '00000000000000000000000000000000')):
+            path = Path('/proc/net') / name
+            if not path.exists(): self.skipTest('kernel does not expose this socket-table header')
+            with path.open() as handle: header = handle.readline()
+            # Read the public schema header only, never live connection rows.
+            self.assertEqual(self.release.viewers(header), 0)
+            row = '0: ' + address + ':16A8 ' + address + ':1234 01\n'
+            self.assertEqual(self.release.viewers(header + row), 1)
+            with self.assertRaises(ValueError): self.release.viewers(header + 'malformed\n')
 
 
 if __name__ == '__main__': unittest.main(verbosity=2)

@@ -206,12 +206,17 @@ class Releases:
     @staticmethod
     def viewers(table):
         lines = table.splitlines()
-        if not lines or not all(word in lines[0] for word in ('local_address', 'rem_address', 'st')):
+        if not lines or lines[0].split()[:4] not in (
+                ['sl', 'local_address', 'rem_address', 'st'],
+                ['sl', 'local_address', 'remote_address', 'st']):
             raise ValueError('unreadable socket table')
         count = 0
         for line in lines[1:]:
             fields = line.split()
-            if len(fields) < 4 or not re.fullmatch(r'[0-9A-Fa-f]+:[0-9A-Fa-f]{4}', fields[1]) or not re.fullmatch(r'[0-9A-Fa-f]{2}', fields[3]):
+            address = r'(?:[0-9A-Fa-f]{8}|[0-9A-Fa-f]{32}):[0-9A-Fa-f]{4}'
+            if (len(fields) < 4 or not re.fullmatch(r'[0-9]+:', fields[0])
+                    or not re.fullmatch(address, fields[1]) or not re.fullmatch(address, fields[2])
+                    or not re.fullmatch(r'[0-9A-Fa-f]{2}', fields[3])):
                 raise ValueError('malformed socket observation')
             if fields[1].rsplit(':', 1)[1].upper() == '16A8' and fields[3].upper() == '01':
                 count += 1

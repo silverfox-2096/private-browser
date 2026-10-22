@@ -23,7 +23,7 @@ Onboarding changes are based on public main `013165caac3a30dccea22db0634138b45ed
 | Configuration-only visual walkthrough | RECORDED, synthetic discovery/port fixture | [Actual wizard prompts and playback](QUICKSTART.md#visual-walkthrough-and-measured-acceptance); no VPN or browser success inferred. |
 | Login/browser screenshots, full walkthrough and install measurements | NOT RECORDED | Browser certificate warning needs human handoff; clean-host measurements remain acceptance tasks. |
 | Offline release packaging | PASS: 17 tests on22October | Frozen source archive, immutable image references, complete acceptance receipts, integrity/corruption controls, and resolved Compose equivalence. Fixtures are synthetic; no real release acceptance is inferred. |
-| Guided prebuilt lifecycle | PASS: 33 isolated tests on22October | Local selection/start/update/rollback, recovery journals, gate/viewer controls, credentials, source compatibility, immutable identities, login response and live-child timeout safeguards. Docker/VPN operations are simulated; real installation acceptance remains pending. |
+| Guided prebuilt lifecycle | PASS: 34 isolated tests on22October | Local selection/start/update/rollback, recovery journals, gate/viewer controls, credentials, source compatibility, immutable identities, login response and live-child timeout safeguards. Docker/VPN operations are simulated; real installation acceptance remains pending. |
 | Versioned prebuilt release | NOT PUBLISHED | [Release path](RELEASING.md); source builds remain available. |
 
 The older [verification sample](VERIFY-OUTPUT.md) is preserved. Follow its dates
