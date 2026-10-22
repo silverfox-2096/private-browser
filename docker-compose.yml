@@ -24,11 +24,11 @@ services:
       - 1.1.1.1
       - 1.0.0.1
     environment:
-      VPN_SERVICE_PROVIDER: protonvpn   # any Gluetun-supported provider works
+      VPN_SERVICE_PROVIDER: ${VPN_SERVICE_PROVIDER:-protonvpn}   # wizard currently supports Proton
       VPN_TYPE: wireguard
       WIREGUARD_PRIVATE_KEY: ${WIREGUARD_PRIVATE_KEY}
       WIREGUARD_ADDRESSES: ${WIREGUARD_ADDRESSES}
-      SERVER_COUNTRIES: Singapore        # change to your preferred exit country
+      SERVER_COUNTRIES: ${SERVER_COUNTRIES:-Singapore}   # wizard writes this to .env
       FIREWALL: "on"
       FIREWALL_OUTBOUND_SUBNETS: ""       # no LAN exceptions (the Docker network stays allowed)
       DNS_SERVER: "on"

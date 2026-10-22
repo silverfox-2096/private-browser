@@ -32,7 +32,7 @@ hardened with Firefox's own `resistFingerprinting`.
 > own dates. Broader boot/relay limits remain explicit. This is not an independent
 > security audit.
 
-**Start here:** [Setup](#setup) · [Daily use](#daily-use) · [Verify](#verify-it-works) · [Troubleshooting](#troubleshooting) · [Maintenance](#maintenance)
+**Start here:** [Guided quick-start](QUICKSTART.md) · [Validation summary](VALIDATION.md) · [Setup](#setup) · [Daily use](#daily-use) · [Verify](#verify-it-works) · [Troubleshooting](#troubleshooting) · [Maintenance](#maintenance)
 
 **Understand the limits:** [Privacy boundary](#what-it-does-and-doesnt-do) · [Test coverage](#what-has-been-tested) · [Remaining work](#remaining-work) · [Changelog](#changelog)
 
@@ -49,12 +49,20 @@ Three things to know before you start:
 ## Requirements
 
 - Docker and Docker Compose
-- Python3 on the host for the trusted local-app policy gate
+- Python3 on the host for the trusted local-app policy gate (3.10+ for guided setup)
 - A WireGuard config from any
   [Gluetun-supported provider](https://github.com/qdm12/gluetun/wiki). This example
   uses Proton VPN.
 
 ## Setup
+
+For the initial Linux x86-64 / Proton guided path, see [QUICKSTART.md](QUICKSTART.md).
+Run `./setup.sh` to import a provider configuration locally, generate the internal
+API key and create a browser login. It preserves existing files and refuses to
+take over another installation. Clean-machine acceptance is still pending; see
+[validation](VALIDATION.md) and the [adoption plan](ADOPTION-PLAN.md).
+
+### Manual setup
 
 1. Create your `.env` from the template and lock it down:
    ```
@@ -86,6 +94,13 @@ Three things to know before you start:
    username (`myuser`) and the password you set above.
 
 ## Daily use
+
+Guided installations can use `./pb start`, `./pb status`, `./pb doctor`,
+`./pb stop`, `./pb update` and `./pb verify`; see [command behavior and recovery](QUICKSTART.md#everyday-commands).
+Existing manual installations keep using the commands below. The
+[prebuilt release preview](RELEASING.md#guided-prebuilt-installation-updates-and-rollback)
+has separate bundle/update/rollback commands and still awaits real deployment
+acceptance; no prebuilt release is published.
 
 Start the stack with `./launch.sh` and stop it with `docker compose down`. Stopping
 wipes the whole profile (bookmarks, logins, history, cookies, and downloads) by
