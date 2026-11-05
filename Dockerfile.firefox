@@ -31,7 +31,10 @@ FROM jlesage/baseimage-gui:debian-13-v4.14.0
 # the base on its own schedule, so without this a rebuild keeps the base's
 # OpenSSL, PCRE2 etc. even after Debian ships a fix (Trivy, 2026-10-05).
 # Runs before Mozilla's repo is added, so only Debian packages are touched.
-RUN apt-get update \
+# The base links /var/log to /config/log. Make its target exist during the
+# build so dpkg recognizes the shared directory when unpacking apt updates.
+RUN mkdir -p /config/log \
+    && apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y \
        -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold \
     && rm -rf /var/lib/apt/lists/*

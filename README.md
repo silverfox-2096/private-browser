@@ -21,16 +21,13 @@ the VPN and kill switch and jlesage's [GUI base image](https://github.com/jlesag
 for a VNC web UI, with Firefox installed from Mozilla's own APT repository and
 hardened with Firefox's own `resistFingerprinting`.
 
-> Latest follow-up validation: 2026-10-22. The [actual guarded boot observation](BOOT-VALIDATION.md)
-> supports the bounded startup-barrier finding; its original recorder-wide INCOMPLETE
-> verdict and supplementary evidence are retained. Network4/4, browser7/7 and policy
-> recovery passed. R1's time-bounded retained-image disposition and R2's installed
-> gates are recorded in the [current status register](FOLLOW-UP-PLAN.md#current-status-register).
-> The separately approved Go/PCRE2 VPN replacement passed isolated and live checks;
-> future published recipes do not automatically replace its immutable live pin.
-> Baseline runtime/leak review: 2026-09-26, on one host; older matrices retain their
-> own dates. Broader boot/relay limits remain explicit. This is not an independent
-> security audit.
+> Latest follow-up validation: **2026-11-05**. Firefox 159.0.1 and the x/net 0.62.0
+> VPN fix passed [build, scan and isolated/live checks](VALIDATION-2026-11-05.md).
+> The browser still has **1 Critical and 121 High package findings** across 48
+> advisory/source groups without reported Debian stable fixes. Its prior bounded
+> disposition ended 27 October; see the [open security work](FOLLOW-UP-PLAN.md#current-status-register).
+> Historical boot and relay evidence retains its original scope. These results
+> are from one installation, not an independent security audit.
 
 **Start here:** [Setup](#setup) · [Daily use](#daily-use) · [Verify](#verify-it-works) · [Troubleshooting](#troubleshooting) · [Maintenance](#maintenance)
 
@@ -257,14 +254,15 @@ The default Compose configuration now mounts a [local-app access policy](LOCAL-A
 that blocks browser-initiated connections to private/local addresses. Local dashboards,
 media servers and other Docker apps are intentionally unavailable inside this browser.
 
-The [current status register](FOLLOW-UP-PLAN.md#current-status-register) records
-this completed remediation round: R1 exact-artifact assessment with explicit
-time-bounded retention, R2 installed/published policy gates, R3 consistent
-publication, and R4's [bounded actual-boot guard observation](BOOT-VALIDATION.md).
-No remediation action is carried forward from those four packages. Retained
-findings, untested broader claims and deliberately parked work remain explicit;
-this does not assert zero vulnerabilities or universal boot/relay safety. R1's
-manual reassessment date/triggers remain in force. No new reboot is requested.
+The [current status register](FOLLOW-UP-PLAN.md#current-status-register) keeps
+R1 open after the 5 November reassessment. The update/build repair and newly
+applicable VPN dependency fixes are deployed and validated, but the browser
+retains 48 advisory/source groups (1 Critical / 121 High package rows) without
+reported stable fixes. The prior acceptance ended 27 October and has not been
+renewed. The next priority is a compatible libxml2/parser backport or component
+replacement review. Prior R2 policy gates, R3 publication and R4's
+[bounded actual-boot finding](BOOT-VALIDATION.md) retain their dated completion
+and scope limits. No new reboot is requested.
 
 The [maintained policy gate](LOCAL-APP-POLICY.md#maintained-policy-acceptance-gate)
 checks mounted source, namespace and active ordered IPv4/IPv6 rules independently
@@ -831,11 +829,12 @@ interchangeable.
 
 ## Changelog
 
-Latest: bounded actual-boot evidence/recovery and the approved Go/PCRE2 VPN replacement are complete; retained findings have an explicit disposition. Expand for dated changes.
+Latest: the 5 November update/build and VPN dependency fixes passed validation; browser residual findings remain open and their prior disposition has expired. Expand for dated changes.
 
 <details>
-<summary>Release and maintenance history — latest 22 October 2026</summary>
+<summary>Release and maintenance history — latest 5 November 2026</summary>
 
+- 2026-11-05: Fixed Firefox rebuilds by creating the base image's missing `/config/log` target before Debian package upgrades; APT 3.0.4 and Firefox 159.0.1 are deployed. Updated the VPN to x/net 0.62.0/pb3, removing two newly applicable HTML advisories. Full race/contracts, isolated policy controls, exact scans and separate isolated/production network and browser checks passed. Added conservative cleanup of only the displaced, untagged rollback after a successful update and recovery, plus build-stage labels and [housekeeping guidance](upkeep/README.md). [Current validation](VALIDATION-2026-11-05.md) retains failed-attempt/rollback limits and reopens the browser's residual security work; no scanner exclusions were added.
 - 2026-10-22: Patched the stable-source VPN recipe to Go1.27.3 and compress1.18.7, repaired the manifest-only dependency update, and required fixed PCRE2>=10.46-r1 after a fresh exact-artifact scan exposed cached runtime findings. Full upstream race/auth/policy contracts and the final candidate scan pass. The separately authorized isolated and live rollout passed network4/4, browser7/7, policy, public HTTPS/DNS, API and viewer recovery; immutable override updated, old image retained for rollback and shared backend/network preserved. See [current candidate versus historical rollout](gluetun-patched/README.md).
 - 2026-10-21: Completed the selected [actual-boot guard-barrier observation](BOOT-VALIDATION.md) after separate local authorization. Root process/namespace/policy traces plus retained guard messages and boot-clock correlation support startup ordering; network4/4, browser7/7, HTTPS/DNS and viewer/API recovery passed. The original recorder-wide verdict remains INCOMPLETE (late64MiB cap and a post-init independent health sample); the supplementary finding does not turn it into a full15-minute or absent-tunnel packet test. Viewer/updater restored; original images/config/network retained. R1 retention was explicitly accepted through manual reassessment by27October2026 or earlier on the recorded triggers; R2 protected PR40 publication/snapshots are complete. R1 subsequently reopened on new vendor-fix triggers; see the22October entry.
 - 2026-10-20: Added a trusted host local-app policy assertion to launch/update/verification and maintained browser/updater paths, plus Compose/checker/wrapper mutations, pinned loader contracts and real isolated dual-stack CI controls. Broken policy cannot inherit PASS from VPN health or browser7/7. FAIL/INCOMPLETE remain distinct through rollback. No Firefox firewall privilege added. See [gate scope and installation](LOCAL-APP-POLICY.md#maintained-policy-acceptance-gate); deployment is a separate recorded stage.
