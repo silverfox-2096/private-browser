@@ -122,8 +122,12 @@ fi
 
 log="$STATE/run-$(date +%Y%m%d-%H%M).log"
 echo "full log: $log"
+# Keep one rollback generation. Remember the image displaced from :prev, but
+# remove it only after the new build/checks and stack recovery have succeeded.
+obsolete_prev=$(docker image inspect -f '{{.Id}}' "$PREV" 2>/dev/null || true)
 docker tag "$IMG" "$PREV"
 
+settled=1
 settle() {  # leave the stack as we found it; up -d recreates onto whatever $IMG is now
   # Checked, not assumed: a stack that was up and did not come back gets a priority-1
   # alert, even after a successful update.
@@ -138,16 +142,33 @@ settle() {  # leave the stack as we found it; up -d recreates onto whatever $IMG
     done
     [ "$h" = healthy ] && [ "$(docker inspect -f '{{.State.Running}}' "$FF" 2>/dev/null)" = true ] || ok=0
     if [ "$ok" -ne 1 ]; then
+      settled=0
       echo "settle: stack is DOWN (gluetun=${h:-?})" | tee -a "$log"
       notify "Private Browser: stack is DOWN" \
         "It was running before this update run and did not come back (gluetun=${h:-?}). Run launch.sh. Log: $log" 1
     fi
   else
     if ! docker compose down >>"$log" 2>&1; then
+      settled=0
       echo "settle: compose down failed" | tee -a "$log"
       notify "Private Browser: stack left running" \
         "It was stopped before this update run, and compose down failed. Log: $log" 1
     fi
+  fi
+}
+
+cleanup_obsolete_prev() {
+  [ "$settled" = 1 ] && [ -n "$obsolete_prev" ] || return 0
+  local rollback refs
+  rollback=$(docker image inspect -f '{{.Id}}' "$PREV" 2>/dev/null) || return 0
+  [ "$obsolete_prev" != "$rollback" ] || return 0
+  # Another tag or registry digest can deliberately retain an older specimen.
+  refs=$(docker image inspect -f '{{len .RepoTags}} {{len .RepoDigests}}' "$obsolete_prev" 2>/dev/null) || return 0
+  [ "$refs" = '0 0' ] || return 0
+  # No force: Docker also protects running/stopped containers and child images.
+  # No parent pruning: only this obsolete generation is eligible for removal.
+  if ! docker rmi --no-prune "$obsolete_prev" >>"$log" 2>&1; then
+    echo "cleanup: kept $obsolete_prev (Docker refused removal); see $log" | tee -a "$log"
   fi
 }
 
@@ -205,6 +226,7 @@ case "$brc" in
 esac
 
 settle
+cleanup_obsolete_prev
 rm -f "$STATE/failed"
 echo "$latest" > "$STATE/notified"
 notify "Private Browser: Firefox $new installed" \

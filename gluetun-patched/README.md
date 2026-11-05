@@ -1,4 +1,34 @@
-# Patched Gluetun security follow-up — 2026-10-22
+# Patched Gluetun security follow-up — 5 November 2026
+
+The recipe now uses **x/net v0.62.0**, fixing
+[GO-2026-6860](https://pkg.go.dev/vuln/GO-2026-6860) and
+[GO-2026-6866](https://pkg.go.dev/vuln/GO-2026-6866). Matching-source analysis found
+HTML Parse/Render call paths in the provider updater. Application source,
+Go 1.27.3, compress 1.18.7 and firewall privileges are unchanged. Build metadata
+identifies this custom revision as **v3.41.3-pb3**.
+
+Full upstream race tests, authorization/local-policy contracts and 14 isolated
+dual-stack policy controls pass. The exact pb3 output has zero Critical, High,
+Medium or Low findings and one UNKNOWN with Trivy 0.76.0 and its database updated
+5 November 2026 at 01:19 UTC. The remaining crypto/openpgp advisory is a module-only
+source match; its affected package is not imported. No exclusion was added.
+
+A local rollout passed separate real isolated and production network checks
+(4/4 each), browser checks (7/7 each), policy, API authentication (401/200), public
+HTTPS/DNS and viewer recovery under the updater lock and a verified 503 gate with
+zero connected viewers. The previous output remains available for rollback.
+Shared network/backend and optional-service state were preserved. The first
+isolated browser harness lacked a helper and triggered verified rollback; the
+corrected full retry passed. Raw runtime receipts remain private. See the
+[sanitized validation summary](../VALIDATION-2026-11-05.md). This is not a new
+actual-boot validation.
+
+Build/test: `docker build --target test gluetun-patched`, then
+`docker build --target candidate -t private-gluetun:v3.41.3-pb3 gluetun-patched`.
+Every output needs its own exact scan and runtime validation.
+
+## Historical 22 October follow-up
+
 
 The current recipe uses checksum-pinned stable application source, Go 1.27.3,
 and compress 1.18.7. It upgrades Alpine packages and requires PCRE2 10.46-r1
