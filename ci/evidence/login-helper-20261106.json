@@ -1,0 +1,38 @@
+{
+  "name": "login-helper",
+  "reference": "httpd:2.4-alpine@sha256:d72968666c0a6961b07036d85fc053bc3cf640583cb1ff8360e1617818f164dc",
+  "image": {
+    "id": "sha256:d72968666c0a6961b07036d85fc053bc3cf640583cb1ff8360e1617818f164dc",
+    "descriptor": {
+      "digest": "sha256:d72968666c0a6961b07036d85fc053bc3cf640583cb1ff8360e1617818f164dc",
+      "mediaType": "application/vnd.oci.image.index.v1+json",
+      "size": 10205
+    }
+  },
+  "config_id": "sha256:ac97d20da9c40083278e906e93642fdcc2f34619249e646897c0b6ba26ff8a57",
+  "archive_sha256": "ead7c9156e158ff51246d787af651c36e1e456ccb37bf5882d02c9c4a5881b8a",
+  "started": "2026-11-06T06:07:25.615855+00:00",
+  "completed": "2026-11-06T06:07:27.775571+00:00",
+  "scanner": "aquasec/trivy@sha256:2416d1f74045b57274df1a340eee6b510cacd73c66a6ccb8da092b117eb7d222",
+  "database": {
+    "Version": 2,
+    "NextUpdate": "2026-11-07T01:07:43.832839854Z",
+    "UpdatedAt": "2026-11-06T01:07:43.832840315Z",
+    "DownloadedAt": "2026-11-06T05:48:28.032094251Z"
+  },
+  "summary": {
+    "CRITICAL": 0,
+    "HIGH": 0,
+    "MEDIUM": 0,
+    "LOW": 0,
+    "UNKNOWN": 0
+  },
+  "fixable_high_critical": 0,
+  "network": "none",
+  "daemon_socket_mounted": false,
+  "verified_platform": "linux/amd64",
+  "verification_scope": "Root descriptor and selected runnable manifest/config/layers; other architectures and attestations not claimed",
+  "contract": "PASS: real bcrypt accepts correct synthetic password and rejects wrong one; network disabled; no host mounts",
+  "replaces": "httpd:2.4-alpine@sha256:435f992d56166d3c3bd16902ca3c4c7a6629a031731a3f95220535a88c8fdb69",
+  "reason": "Initial exact-head companion gate found 12 fixable High package rows in old helper. Refreshed official image resolves those rows without suppression."
+}

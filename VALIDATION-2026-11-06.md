@@ -19,9 +19,9 @@ bind this artifact to its actual image recipe and source inputs.
 | Guided setup / packaging / lifecycle | PASS: 40/17/34 local regressions. Docker/VPN operations simulated; real private-file, bcrypt and process-control transitions retain their documented scope. |
 | Maintained controls | PASS: script/policy/updater/module controls, ShellCheck and Dockerfile lint. Browser-verdict tests pass 57/57 with the project-pinned Node 22; failed restricted-environment host Node 24 attempt retained privately. |
 | Existing installation | Installer refused foreign live containers before creating credentials or changing services. Production remains unchanged. |
-| Clean first installation | NOT RUN. Independent Fedora44 x86-64 clone prepared; its inherited VPN-only filter prevents prerequisite downloads. Trial-only network preparation is pending. |
+| Clean first installation | NOT RUN. Independent Fedora 44 x86-64 clone prepared; inherited VPN-only filter blocked downloads. User approved a trial-only change to public IPv4 with LAN blocking retained; prerequisites are being prepared. |
 | Novice trial, real installation/recovery, screenshots and resource measurements | NOT COMPLETE. These require actual observations; no synthetic result fills the blank trial worksheet. |
-| Publication | Local review candidate only. Draft PR #43 and protected CI need the final reviewed source update; no release, registry upload or merge is asserted here. |
+| Publication | Source published in draft PR #43; protected checks are rerun for the refreshed helper pin. No release, registry upload or merge. |
 
 ## Fresh complete scans
 
@@ -53,3 +53,14 @@ Green fixable-only CI is not zero-advisory clearance or a release decision.
 
 The earlier [5 November deployed checkpoint](VALIDATION-2026-11-05.md) remains
 history for the currently running installation. This candidate has not replaced it.
+
+## Password helper refresh
+
+The old immutable helper image produced 12 fixable High package rows in the
+initial companion workflow. The current official `httpd:2.4-alpine` image is now
+pinned to `sha256:d72968666c0a6961b07036d85fc053bc3cf640583cb1ff8360e1617818f164dc`.
+The real bcrypt accept/reject contract passes with network disabled and no host
+mounts. The exact selected Linux/amd64 artifact scans with zero findings at every
+severity using the same fresh database. [Identity and scoped evidence](ci/evidence/login-helper-20261106.json).
+Other architectures are not claimed. Failed original workflow reports remain
+available; this change fixes the pin rather than bypassing their gate.

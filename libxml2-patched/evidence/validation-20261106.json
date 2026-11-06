@@ -32,7 +32,7 @@
       "UNKNOWN": 12
     },
     "fixable_high_critical": 0,
-    "real_clean_install": "NOT RUN; trial VM networking blocks prerequisite download",
+    "real_clean_install": "NOT RUN; VM prerequisites being prepared after user-approved trial-only network change; original inherited VPN-only download refusal retained",
     "novice_trial": "NOT RUN",
     "screenshots": "NOT RECORDED",
     "production_deployment": "NOT PERFORMED",
