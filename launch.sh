@@ -54,4 +54,6 @@ case "$policy_rc" in
   *) echo "INCOMPLETE  local-app policy: checker unavailable (exit $policy_rc)" >&2; exit 3 ;;
 esac
 
-xdg-open "$UI" 2>/dev/null || echo "Open $UI"
+if [ "${PB_NO_OPEN:-0}" != 1 ]; then
+  xdg-open "$UI" 2>/dev/null || echo "Open $UI"
+fi

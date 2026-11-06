@@ -1,0 +1,16 @@
+CONFIGURATION-ONLY DEMO — synthetic credentials; Docker discovery/port checks simulated.
+$ ./setup.sh --configure-only
+Private Browser setup — Proton VPN on Linux x86-64.
+Your VPN credentials stay on this machine. Stopping erases the browser session.
+Existing files will be preserved. No host settings will be changed.
+Use a Proton WireGuard config downloaded from your own account.
+Only its private key and IPv4 address are imported; DNS, peers and hooks are not applied.
+The VPN server is selected by country using Gluetun’s Proton integration.
+Is this a Proton VPN configuration? [y/N] y
+Path to your WireGuard .conf file (keep it outside this repo): /tmp/user/1000/pb-onboarding-demo-lt6agzuk/provider.conf
+Exit country [Singapore]: Singapore
+Browser login username [browser]: browser
+Browser password (hidden; at least 12 characters):
+Repeat browser password:
+Local configuration is ready. Existing credentials were preserved.
+Nothing was built or started. Next: ./pb start

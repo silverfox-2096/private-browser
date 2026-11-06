@@ -226,6 +226,11 @@ else failn=$((failn+1)); echo "FAIL  launch: UI probe has no --max-time"; fi
 rm -f "$SD/calls"; bash "$W/launch.sh" >/dev/null 2>&1
 if command grep -q '^xdg-open' "$SD/calls"; then pass=$((pass+1)); echo "ok    launch: opens the UI when ready"
 else failn=$((failn+1)); echo "FAIL  launch: did not open the UI when ready"; fi
+rm -f "$SD/calls"; caller_rc=0
+PB_NO_OPEN=1 bash "$W/launch.sh" >/dev/null 2>&1 || caller_rc=$?
+if [ "$caller_rc" -eq 0 ] && ! command grep -q '^xdg-open' "$SD/calls" && command grep -q '^docker compose up' "$SD/calls"; then
+  pass=$((pass+1)); echo 'ok    launch: caller can verify image identity before opening the UI'
+else failn=$((failn+1)); echo 'FAIL launch: deferred browser opening did not preserve successful readiness'; fi
 
 mkdir -p "$W/maintenance"; touch "$W/maintenance/active"
 t "launch: updater gate blocks startup" 1 'is updating' '' $N

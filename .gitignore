@@ -17,3 +17,14 @@ maintenance/active
 
 __pycache__/
 *.pyc
+
+# Local setup locking, interrupted secret writes, and provider configuration
+.pb-setup.lock
+.pb-secret-*
+*.conf.wg
+*.conf
+*.ovpn
+
+# Local prebuilt release selection and interrupted transition journal
+.pb-release*.json
+docker-compose.release.yml

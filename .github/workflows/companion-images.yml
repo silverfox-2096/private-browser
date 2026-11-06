@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [gluetun, creepjs]
+        service: [gluetun, creepjs, login-helper]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Build and identify the exact Compose image
@@ -27,10 +27,17 @@ jobs:
           GLUETUN_API_KEY: unused-in-scan
         run: |
           docker compose --profile test config --format json > compose-resolved.json
-          image=$(python3 -c 'import json,os; print(json.load(open("compose-resolved.json"))["services"][os.environ["SERVICE"]]["image"])')
+          if [ "$SERVICE" = login-helper ]; then
+            image=$(python3 -c 'from scripts.onboard import helper_image; print(helper_image())')
+          else
+            image=$(python3 -c 'import json,os; print(json.load(open("compose-resolved.json"))["services"][os.environ["SERVICE"]]["image"])')
+          fi
           if [ "$SERVICE" = gluetun ]; then
             docker build --target test gluetun-patched
             BUILDX_METADATA_PROVENANCE=max docker buildx build --load --target candidate --metadata-file gluetun-build-metadata.json -t "$image" gluetun-patched
+          elif [ "$SERVICE" = login-helper ]; then
+            docker pull "$image"
+            python3 ci/test-login-helper.py
           else
             docker compose --profile test build --pull --no-cache creepjs
           fi
