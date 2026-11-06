@@ -35,7 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
       - name: ShellCheck (preinstalled on the runner)
-        run: shellcheck setup.sh pb launch.sh update.sh verify.sh startup-guard.sh gluetun-patched/update-module.sh ci/fingerprint.sh ci/test-scripts.sh probe/checks.sh upkeep/pb-autoupdate.sh upkeep/test-pba.sh
+        run: shellcheck setup.sh pb launch.sh update.sh verify.sh startup-guard.sh gluetun-patched/update-module.sh libxml2-patched/build.sh ci/fingerprint.sh ci/test-scripts.sh probe/checks.sh upkeep/pb-autoupdate.sh upkeep/test-pba.sh
       - name: Failure-path tests (docker/curl stubbed; no stack, no network)
         run: bash ci/test-scripts.sh
       - name: Local policy assertions and updater/wrapper verdicts
@@ -61,7 +61,7 @@ jobs:
         run: |
           img=$(sed -n 's/^ *image: *\(hadolint\/.*\)/\1/p' ci/pins/compose.yml)
           docker run --rm -v "$PWD:/repo" -w /repo "${img:?no hadolint pin}" \
-            hadolint Dockerfile.firefox Dockerfile.creepjs gluetun-patched/Dockerfile
+            hadolint Dockerfile.firefox Dockerfile.creepjs gluetun-patched/Dockerfile libxml2-patched/Dockerfile.consumer
 
   checkov:
     runs-on: ubuntu-latest
@@ -131,6 +131,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
       - name: Fingerprint checks (headless Firefox + self-hosted CreepJS)
         run: bash ci/fingerprint.sh
+      - name: Original-header XML and actual SVG consumer compatibility
+        run: python3 ci/test-libxml2-consumer.py private-firefox:ci
       - name: Fail-closed startup guard (isolated readiness fixtures; no VPN)
         run: python3 ci/test-startup-guard.py
       - name: Keep the raw CreepJS output when a check fails

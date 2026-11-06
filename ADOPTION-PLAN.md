@@ -1,5 +1,11 @@
 # Adoption plan
 
+6 November continuation: draft work is reconciled with merged PR49 and adds a
+Debian-stable libxml2 vendor backport. [Local candidate validation](VALIDATION-2026-11-06.md)
+passes its declared isolated checks; actual installation and human acceptance
+remain open. A separate Fedora trial copy is being prepared without changing
+the maintainer's production installation. Earlier checkpoints below are history.
+
 Recorded 22 October 2026, Asia/Kolkata. The user requested that this plan be saved,
 set as the active goal, and implemented. This is a new adoption workstream after
 the completed R1–R4 remediation round. It does not reopen accepted findings or

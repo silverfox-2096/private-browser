@@ -1,0 +1,47 @@
+{
+  "date": "2026-11-06",
+  "candidate_image": "sha256:ff13f76c7caec4cdb5fdc8f1dbd4ffbf99926ffa8fcfede1eec7a2697bd15778",
+  "production_changed": false,
+  "libxml2_version": "2.12.7+dfsg+really2.9.14-2.1+deb13u3+pb1",
+  "vendor_patch_sha256": "6c2b8a7b6fa470efcb1854e5c73bd7e1ae1663d8b111e27ce9232bbc1fe44f54",
+  "runtime_package_sha256": "924747359c7be197fa30b52eb8b33bd9d8e590b18e5cca4ad1d0446d30ebf48e",
+  "inputs": {
+    "Dockerfile.firefox": "c9b6305bbc582ef0bbc949f1ad5f57d63ec4b1d9f2e6be0e9c4f5ed5f99858e0",
+    "maintenance.conf": "38d47ac95e0b3cf2a8494e42f9883914bcf82bf0a099a45f9bb8375a0026f1eb",
+    "libxml2-patched/build.sh": "bae6a055ca1ca004b4e6d193cf8aa2352285d0a90a28066ac897fba391ccfb1a",
+    "libxml2-patched/source.sha256": "6cb555e2aca246ec7732957529466d2a2c0fb9ae6fc42ef7c53185c032168ca9",
+    "libxml2-patched/patch.sha256": "848e0f747721cae57f83dbe01a034ab62ae50c7e5d1f87eae895f242a1a507d9",
+    "libxml2-patched/CVE-2026-6653.patch": "6c2b8a7b6fa470efcb1854e5c73bd7e1ae1663d8b111e27ce9232bbc1fe44f54"
+  },
+  "validation": {
+    "upstream_parser_tests": 3360,
+    "upstream_recursion_tests": 9,
+    "upstream_api_cases": 280912,
+    "upstream_status": "PASS",
+    "w3c_xmlconf": "0 tests; corpus not supplied; no conformance claim",
+    "python_bindings": "not built; absent from runtime",
+    "original_header_runtime_consumer": "PASS XML/internal entity, direct installed librsvg render and malformed SVG error handling",
+    "gdkpixbuf_svg_loader": "absent; not counted as a loader pass",
+    "browser_fingerprint": "PASS; 3 preferences and 4 browser/CreepJS gates",
+    "startup_guard": "PASS; 7 isolated controls; not an actual reboot",
+    "full_scan": {
+      "CRITICAL": 1,
+      "HIGH": 122,
+      "MEDIUM": 256,
+      "LOW": 166,
+      "UNKNOWN": 12
+    },
+    "fixable_high_critical": 0,
+    "real_clean_install": "NOT RUN; trial VM networking blocks prerequisite download",
+    "novice_trial": "NOT RUN",
+    "screenshots": "NOT RECORDED",
+    "production_deployment": "NOT PERFORMED",
+    "scan_database_updated_utc": "2026-11-06T01:07:43.832840315Z"
+  },
+  "scan_interpretation": {
+    "CVE-2026-6653": "Local vendor backport applied and isolated compatibility/regression tests passed; scanner still reports Debian vulnerable custom version. No scanner suppression. Real-VPN candidate acceptance pending.",
+    "CVE-2026-76844": "New zlib High finding; Debian stable vulnerable, no stable fixed version reported. Scanner title incorrectly mentions webpack; Debian primary record describes zlib gz_write/gzclearerr error path. Applicability remains pending.",
+    "residual_advisory_source_groups": 49,
+    "disposition": "OPEN; expired 27 October acceptance not renewed"
+  }
+}

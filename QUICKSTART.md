@@ -41,8 +41,18 @@ cd private-browser
 ./setup.sh
 ```
 
-These instructions work after the onboarding change is merged. Before then,
-contributors must check out the adoption pull request; see [the plan](ADOPTION-PLAN.md).
+These main-branch instructions work after the onboarding change is merged.
+While [PR43](https://github.com/silverfox-2096/private-browser/pull/43) remains a
+draft, use this source trial instead, on a separate supported machine:
+
+```bash
+git clone --branch feat/guided-adoption --single-branch https://github.com/silverfox-2096/private-browser.git private-browser-trial
+cd private-browser-trial
+./setup.sh
+```
+
+The draft is for acceptance testing, not a published prebuilt release. Record
+`git rev-parse HEAD` before the trial and follow the [trial worksheet](ADOPTION-TRIAL.md).
 No versioned installer or prebuilt release is published by these instructions.
 
 The wizard asks whether the file is from Proton, where it is saved, your exit

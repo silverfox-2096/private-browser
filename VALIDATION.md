@@ -1,5 +1,11 @@
 # Validation at a glance
 
+Current candidate work, 6 November 2026: [dated results and limits](VALIDATION-2026-11-06.md).
+The guided branch includes the fixes merged in PR49 and a locally validated
+libxml2 vendor backport. Clean-host installation, unfamiliar-user acceptance,
+screenshots and prebuilt publication remain incomplete. The tables below retain
+their historical 22 October scope; they do not clear the current advisories.
+
 Recorded 22 October 2026. This is a navigation summary, not a new security audit.
 Historical runtime results retain their original dates, artifacts and limits.
 Onboarding changes are based on public main `013165caac3a30dccea22db0634138b45ed8f853`.

@@ -12,6 +12,21 @@
 # FF_PREF_* handler). Pinned to a release tag so the copied scripts do not move.
 FROM jlesage/firefox:v26.09.1 AS jlfirefox
 
+# Debian stable uses the older libxml2 source. Rebuild that source with the
+# published Ubuntu fix instead of substituting a testing/unstable library.
+FROM debian:13-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2 AS xmlpackages
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential debhelper \
+       pkg-config liblzma-dev zlib1g-dev rename ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /build
+COPY libxml2-patched/build.sh libxml2-patched/CVE-2026-6653.patch libxml2-patched/source.sha256 libxml2-patched/patch.sha256 /pb-libxml2/
+RUN bash /pb-libxml2/build.sh
+
+FROM xmlpackages AS xmlbuild
+RUN --network=none make -C /src/libxml2/builddir/main -j1 check > /out/upstream-tests.log 2>&1 \
+    || { tail -100 /out/upstream-tests.log; exit 1; }
+
 # Fetch Mozilla's APT signing key and refuse to continue unless its fingerprint
 # matches the one Mozilla publishes. This stage is discarded after the build.
 FROM debian:13-slim AS mozkey
@@ -74,6 +89,16 @@ RUN add-pkg ca-certificates \
              /usr/share/fonts/truetype/noto/NotoSansMasaramGondi-*.ttf \
              /usr/share/fonts/truetype/noto/NotoSerifYezidi-*.ttf \
     && fc-cache -f
+
+# Install only the rebuilt runtime package. A later stable revision must get a
+# fresh source review; never downgrade a newly fixed distribution package.
+COPY --from=xmlbuild /out/libxml2_*_amd64.deb /tmp/pb-libxml2.deb
+RUN installed=$(dpkg-query -W -f '${Version}' libxml2) \
+    && patched=$(dpkg-deb -f /tmp/pb-libxml2.deb Version) \
+    && dpkg --compare-versions "$installed" le "$patched" \
+    && dpkg -i /tmp/pb-libxml2.deb \
+    && rm /tmp/pb-libxml2.deb
+COPY --from=xmlbuild /out/source.sha256 /out/patch.sha256 /out/packages.sha256 /out/build-packages.txt /usr/share/doc/libxml2/private-browser-build/
 
 # Container glue reused from jlesage/firefox (MIT, (c) Jocelyn Le Sage):
 # app launcher, profile/log init, FF_PREF_* handler, default prefs, window

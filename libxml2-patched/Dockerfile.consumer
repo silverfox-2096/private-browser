@@ -1,0 +1,18 @@
+# Compile against Debian's original headers, then run against the exact browser
+# artifact separately. No library from this compiler stage reaches the runtime.
+# checkov:skip=CKV_DOCKER_2:Discarded compiler/artifact fixture, not a deployed service
+# checkov:skip=CKV_DOCKER_3:Compiler installs build dependencies as root; runtime test drops privileges separately
+# checkov:skip=CKV_DOCKER_8:No explicit root USER; only a disposable compiler and scratch artifact export
+FROM debian:13-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2 AS compile
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends gcc pkg-config \
+       librsvg2-dev libgdk-pixbuf-2.0-dev libxml2-dev \
+    && rm -rf /var/lib/apt/lists/*
+COPY consumer-smoke.c /consumer-smoke.c
+# pkg-config deliberately returns separate compiler/linker arguments.
+# hadolint ignore=SC2046
+RUN cc -Wall -Wextra -Werror /consumer-smoke.c -o /consumer-smoke \
+    $(pkg-config --cflags --libs librsvg-2.0 gdk-pixbuf-2.0 libxml-2.0) \
+    && dpkg-query -W libxml2-dev librsvg2-dev libgdk-pixbuf-2.0-dev > /headers.txt
+FROM scratch AS artifacts
+COPY --from=compile /consumer-smoke /headers.txt /

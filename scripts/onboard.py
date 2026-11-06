@@ -426,7 +426,7 @@ def start(build=False):
         print('Preparing the selected immutable release images…', flush=True)
         identities = release.pull(release.state()['active'])
     else:
-        print('Building images. Progress is captured locally; credentials are never printed.', flush=True)
+        print('Building images. This can take several minutes; credentials are never printed.', flush=True)
     # Initial build explicitly includes the locally patched VPN, whose pull policy
     # is never. On subsequent starts Compose reuses existing images.
     if not release and (build or not owned):
