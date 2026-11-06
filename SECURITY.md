@@ -35,6 +35,12 @@ scan scope, prioritized package/path evidence and unresolved decisions. It also
 provides a manual archive-scanning pattern; routine recipe CI is separate. No
 alert is dismissed by that assessment, and residual risk is not silently accepted.
 
+The [5 November follow-up](VALIDATION-2026-11-05.md) fixes the update failure and
+two VPN HTML advisories. The exact browser scan retains 1 Critical and 121 High
+package entries across 48 advisory/source groups, with no reported Debian stable
+fixes. The prior residual disposition ended 27 October and is not renewed. See the
+[current status register](FOLLOW-UP-PLAN.md#current-status-register) for open work.
+
 ## Repository protection settings
 
 Verified 19 October 2026: dependency vulnerability alerts and Dependabot security-fix

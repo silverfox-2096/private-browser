@@ -1,5 +1,29 @@
 # Retained advisories and exact-image assessment
 
+## Current follow-up — 5 November 2026
+
+Firefox 159.0.1 is deployed and the Debian APT 3.0.4 security upgrade now builds:
+the base's `/var/log` symlink needs its `/config/log` target during package
+unpacking. Both fixable High package entries for CVE-2026-109518 are removed.
+
+Fresh exact local Firefox scan: **1 Critical, 121 High, 259 Medium, 166 Low and
+12 UNKNOWN**, using Trivy 0.76.0 with its database updated 5 November 2026 at
+01:19 UTC. The 122 Critical/High package rows map to 48 advisory/source groups,
+all open in Debian stable with no reported fixed stable version. All 42 previous
+groups persist; six new High cases concern Expat, SQLite and libXi. Feature
+absences and Mozilla 159.0.1 media mappings were refreshed; these remain bounded
+path findings. The prior disposition ended 27 October and has not been renewed.
+
+The local VPN pb3 output uses x/net 0.62.0 and removes both newly reported HTML
+advisories. Its exact scan retains only the unimported OpenPGP UNKNOWN. Isolated
+and production network, browser, policy, API and viewer recovery passed. See the
+[dated validation summary](VALIDATION-2026-11-05.md) and
+[VPN record](gluetun-patched/README.md). Local output validation and repository
+recipe CI are separate scopes; passing operational tests does not close the
+remaining browser findings.
+
+## Historical assessment — 20 October 2026
+
 Historical assessment date: 20 October 2026. This is a bounded package/path assessment,
 not an exploit test or acceptance of material residual risk. Findings remain
 visible; no scanner exclusion or alert dismissal was added.

@@ -32,7 +32,19 @@ docker() {
         *Running*) echo "${S_WAS_UP:-true}" ;;
         *Image*) echo sha256:new ;;
       esac ;;
-    image) echo sha256:new ;;
+    image)
+      case "$*" in
+        *RepoTags*) echo "${S_OLD_PREV_REFS:-0 0}" ;;
+        *private-firefox:prev*)
+          if command grep -q 'tag private-firefox:mozilla private-firefox:prev' "$SD/tags" 2>/dev/null; then
+            echo sha256:new
+          else
+            [ "${S_NO_OLD_PREV:-0}" = 0 ] || return 1
+            echo "${S_OLD_PREV_ID:-sha256:old-prev}"
+          fi ;;
+        *) echo sha256:new ;;
+      esac ;;
+    rmi) return "${S_CLEAN_RC:-0}" ;;
     exec)
       case "$*" in
         *firefox\ --version*) echo "Mozilla Firefox 157.0" ;;
@@ -85,13 +97,38 @@ t() {
 N=_=_
 
 t "success, stack back up"            0 'title=Private Browser: Firefox 157.0 installed' 'DOWN|FAILED' $N
+if command grep -q '^docker rmi --no-prune sha256:old-prev$' "$SD/calls"; then
+  pass=$((pass+1)); echo 'ok    successful update removes only displaced rollback, without force or parent pruning'
+else failn=$((failn+1)); echo 'FAIL obsolete rollback not cleaned'; fi
 t "success, stack does NOT come back" 0 'stack is DOWN.*priority=1'  ''        S_SETTLE_HEALTH=unhealthy
+if ! command grep -q '^docker rmi ' "$SD/calls"; then
+  pass=$((pass+1)); echo 'ok    failed recovery preserves older rollback'
+else failn=$((failn+1)); echo 'FAIL cleanup after failed recovery'; fi
 t "verify INCOMPLETE rolls back"      3 'verify.sh INCOMPLETE'       'installed' S_VRC=3
+if ! command grep -q '^docker rmi ' "$SD/calls"; then
+  pass=$((pass+1)); echo 'ok    failed validation preserves older rollback'
+else failn=$((failn+1)); echo 'FAIL cleanup after failed validation'; fi
 t "verify FAIL rolls back"            1 'verify.sh failed \(exit 1\)' 'installed' S_VRC=1
 t "old grep gone: exit 0 is enough"   0 'installed'                  'FAILED'  "S_VOUT=PASS        kill switch (new spacing)"
 t "checks INCOMPLETE is named"        3 'browser checks INCOMPLETE'         'installed' "S_COUT=INCOMPLETE  dnsLeak: no resolver identity" S_CRC=3
 t "fail + stack does not come back"   1 'stack is DOWN'              ''        S_VRC=1 S_SETTLE_HEALTH=unhealthy
 t "was down, compose down fails"      0 'stack left running'         ''        S_WAS_UP=false S_DOWN_RC=1
+
+for retained in '1 0' '0 1'; do
+  t "old rollback refs $retained retained" 0 'installed' 'FAILED' "S_OLD_PREV_REFS=$retained"
+  if ! command grep -q '^docker rmi ' "$SD/calls"; then
+    pass=$((pass+1)); echo "ok    retained refs $retained prevent deletion"
+  else failn=$((failn+1)); echo 'FAIL retained image deleted'; fi
+done
+t "first update without previous rollback" 0 'installed' 'FAILED' S_NO_OLD_PREV=1
+if ! command grep -q '^docker rmi ' "$SD/calls"; then
+  pass=$((pass+1)); echo 'ok    no old rollback means no deletion'
+else failn=$((failn+1)); echo 'FAIL deletion without old rollback'; fi
+t "unchanged rollback identity retained" 0 'installed' 'FAILED' S_OLD_PREV_ID=sha256:new
+if ! command grep -q '^docker rmi ' "$SD/calls"; then
+  pass=$((pass+1)); echo 'ok    current rollback identity protected'
+else failn=$((failn+1)); echo 'FAIL current rollback deleted'; fi
+t "Docker refuses cleanup (e.g. stopped container)" 0 'installed' 'FAILED' S_CLEAN_RC=1
 
 t "open viewer defers"                0 'Firefox 157.0 ready' 'installed|FAILED' S_TABS=1
 env HOME="$H" FORCE=1 S_TABS=1 bash "$PBA" >/dev/null 2>&1

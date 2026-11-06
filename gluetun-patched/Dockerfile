@@ -3,6 +3,10 @@
 # checkov:skip=CKV_DOCKER_3:Gluetun init must configure interfaces and firewall as root
 # checkov:skip=CKV_DOCKER_4:ADD fetches the exact remote stable-source archive with SHA256 verification; COPY cannot fetch URLs
 FROM golang:1.27.3-alpine@sha256:f2c872bcee949b7be9c490efd02b48a8a2fbf947cdf533f1c58525ec9d8170fd AS source
+# These labels stay on disposable source/test/build stages. The runtime stage
+# starts from Gluetun separately and does not inherit this cleanup classification.
+LABEL io.private-browser.project="private-browser" \
+      io.private-browser.role="gluetun-build"
 ADD --checksum=sha256:5f382f180780632afe57d9cba03978bc0524e469c8288f72e0f416a7749ac62c https://codeload.github.com/passteque/gluetun/tar.gz/3d1e20c5551e9cae1f9d938dc7b7214a6987f27e /tmp/upstream.tar.gz
 WORKDIR /src
 RUN tar -xzf /tmp/upstream.tar.gz --strip-components=1
@@ -25,7 +29,7 @@ RUN printf '%s\n' "bb1e76ed06d4b8b92467595ec18c2c85f37f8df31e55ec4c1583e40dbecc7
     && CGO_ENABLED=1 go test -race -count=1 ./...
 
 FROM source AS build
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.version=v3.41.3-pb2 -X main.created=2026-10-21 -X main.commit=3d1e20c5551e9cae1f9d938dc7b7214a6987f27e" -o /entrypoint cmd/gluetun/main.go
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.version=v3.41.3-pb3 -X main.created=2026-11-05 -X main.commit=3d1e20c5551e9cae1f9d938dc7b7214a6987f27e" -o /entrypoint cmd/gluetun/main.go
 # Retain build metadata separately from the compiled binary.
 # hadolint ignore=DL3059
 RUN go version -m /entrypoint > /buildinfo.txt
@@ -37,8 +41,8 @@ RUN apk upgrade --no-cache && apk add --no-cache 'pcre2>=10.46-r1' \
     && apk info -vv > /package-versions.txt
 COPY --from=build /entrypoint /gluetun-entrypoint
 COPY --from=build /buildinfo.txt /buildinfo.txt
-LABEL org.opencontainers.image.version="v3.41.3-pb2" \
+LABEL org.opencontainers.image.version="v3.41.3-pb3" \
       org.opencontainers.image.title="Private Browser patched Gluetun stable candidate" \
       org.opencontainers.image.source="https://github.com/silverfox-2096/private-browser" \
-      org.opencontainers.image.revision="3d1e20c5551e9cae1f9d938dc7b7214a6987f27e+pb2" \
-      org.opencontainers.image.created="2026-10-21"
+      org.opencontainers.image.revision="3d1e20c5551e9cae1f9d938dc7b7214a6987f27e+pb3" \
+      org.opencontainers.image.created="2026-11-05"
