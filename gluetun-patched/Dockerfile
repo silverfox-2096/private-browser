@@ -2,7 +2,7 @@
 # checkov:skip=CKV_DOCKER_2:Final stage inherits the pinned Gluetun connectivity healthcheck
 # checkov:skip=CKV_DOCKER_3:Gluetun init must configure interfaces and firewall as root
 # checkov:skip=CKV_DOCKER_4:ADD fetches the exact remote stable-source archive with SHA256 verification; COPY cannot fetch URLs
-FROM golang:1.27.3-alpine@sha256:f2c872bcee949b7be9c490efd02b48a8a2fbf947cdf533f1c58525ec9d8170fd AS source
+FROM golang:1.27.3-alpine@sha256:fa3d596898d9f126af7c01d14ee7597bab3f39cccf392ef36b69fe77cd681f18 AS source
 # These labels stay on disposable source/test/build stages. The runtime stage
 # starts from Gluetun separately and does not inherit this cleanup classification.
 LABEL io.private-browser.project="private-browser" \
